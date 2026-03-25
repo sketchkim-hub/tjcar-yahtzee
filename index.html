@@ -414,6 +414,51 @@ input[type=password]:focus{border-color:var(--steem);}
   background:rgba(248,152,34,0.06);border:1px solid rgba(248,152,34,0.2);
   border-radius:9px;padding:9px 12px;font-size:0.74rem;color:rgba(248,190,100,0.9);margin-bottom:6px;}
 
+/* ═══ 수상 NFT 지급 섹션 ═══ */
+.award-section{background:rgba(248,152,34,0.05);border:1px solid rgba(248,152,34,0.2);
+  border-radius:14px;padding:16px;margin-bottom:12px;}
+.award-section-title{font-family:'Black Han Sans',sans-serif;font-size:1rem;
+  background:linear-gradient(135deg,var(--wax),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:12px;}
+.award-list{display:flex;flex-direction:column;gap:7px;}
+.award-item{display:flex;align-items:center;gap:10px;
+  background:#0a0a18;border-radius:10px;padding:9px 12px;border:1px solid var(--border);}
+.award-item.sent{border-color:rgba(6,214,160,0.3);background:rgba(6,214,160,0.04);}
+.award-item.skipped{opacity:0.4;}
+.award-medal{font-size:1.2rem;flex-shrink:0;width:24px;text-align:center;}
+.award-info{flex:1;min-width:0;}
+.award-player{font-weight:700;font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.award-nft-name{font-size:0.65rem;color:var(--wax);margin-top:1px;}
+.award-wax-addr{font-size:0.6rem;color:var(--text-dim);}
+.award-btn{font-family:'Black Han Sans',sans-serif;font-size:0.7rem;padding:5px 10px;
+  border-radius:7px;border:none;cursor:pointer;transition:all 0.18s;flex-shrink:0;white-space:nowrap;}
+.award-btn-send{background:linear-gradient(135deg,var(--wax),var(--wax-dk));color:#fff;
+  box-shadow:0 2px 8px var(--wax-glow);}
+.award-btn-send:hover{transform:translateY(-1px);}
+.award-btn-send:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+.award-btn-sent{background:rgba(6,214,160,0.12);color:var(--accent3);
+  border:1px solid rgba(6,214,160,0.28);cursor:default;}
+.award-btn-skip{background:transparent;color:var(--text-dim);border:1px solid var(--border);font-size:0.65rem;}
+.award-btn-skip:hover{border-color:var(--accent);color:var(--accent);}
+.award-btn-notemplate{background:rgba(255,255,255,0.03);color:var(--text-dim);
+  border:1px solid var(--border);cursor:default;font-size:0.65rem;}
+.award-tx-link{font-size:0.6rem;color:var(--accent3);text-decoration:none;display:block;margin-top:2px;}
+.award-tx-link:hover{text-decoration:underline;}
+.award-operator-banner{background:rgba(248,152,34,0.06);border:1px solid rgba(248,152,34,0.18);
+  border-radius:10px;padding:11px;font-size:0.75rem;color:rgba(248,190,100,0.85);
+  text-align:center;line-height:1.8;margin-bottom:8px;}
+.award-all-btn{background:linear-gradient(135deg,var(--wax),var(--wax-dk));color:#fff;
+  border:none;border-radius:9px;padding:9px 16px;font-family:'Black Han Sans',sans-serif;
+  font-size:0.85rem;cursor:pointer;width:100%;margin-top:6px;transition:all 0.2s;
+  box-shadow:0 3px 10px var(--wax-glow);}
+.award-all-btn:hover{transform:translateY(-2px);box-shadow:0 5px 16px var(--wax-glow);}
+.award-all-btn:disabled{opacity:0.38;cursor:not-allowed;transform:none;}
+.award-progress{height:3px;background:var(--border);border-radius:2px;
+  margin-top:8px;overflow:hidden;display:none;}
+.award-progress-inner{height:100%;background:linear-gradient(90deg,var(--wax),var(--accent2));
+  border-radius:2px;width:0;transition:width 0.4s;}
+
 .lb-list{display:flex;flex-direction:column;gap:3px;margin-top:5px;}
 .lb-item{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#0a0a18;border-radius:6px;}
 .lb-av{width:18px;height:18px;border-radius:50%;object-fit:cover;}
@@ -741,6 +786,35 @@ input[type=password]:focus{border-color:var(--steem);}
 
       <div style="font-family:'Black Han Sans',sans-serif;font-size:0.72rem;color:var(--text-dim);margin:12px 0 4px;">🏆 리더보드</div>
       <div class="lb-list" id="lbResult"></div>
+
+      <!-- 🟠 수상 NFT 지급 섹션 -->
+      <div id="awardSection" style="display:none;margin-top:14px;">
+        <div class="award-section">
+          <div class="award-section-title">🟠 수상 NFT 지급</div>
+          <!-- 운영자 미로그인 시 안내 -->
+          <div id="awardOperatorBanner" class="award-operator-banner" style="display:none;">
+            🎮 운영자로 WAX 로그인하면<br>수상자에게 NFT를 직접 지급할 수 있습니다.<br>
+            <span style="font-size:0.68rem;color:var(--text-dim);">
+              운영자 계정: <b id="awardOperatorName" style="color:var(--wax);"></b>
+            </span>
+          </div>
+          <!-- 수상 목록 -->
+          <div class="award-list" id="awardList"></div>
+          <!-- 일괄 전송 버튼 (운영자 로그인 시) -->
+          <div id="awardAllWrap" style="display:none;">
+            <div class="award-progress" id="awardProgress">
+              <div class="award-progress-inner" id="awardProgressInner"></div>
+            </div>
+            <button class="award-all-btn" id="awardAllBtn" onclick="sendAllAwards()">
+              🟠 전체 NFT 한번에 지급하기
+            </button>
+            <div style="font-size:0.62rem;color:var(--text-dim);text-align:center;margin-top:4px;">
+              WAX Cloud Wallet에서 각 트랜잭션을 순서대로 승인해 주세요
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="res-acts">
         <button class="btn btn-primary" onclick="shareResult()">📤 결과 공유</button>
         <button class="btn btn-yellow" onclick="saveImg()">💾 이미지 저장</button>
@@ -917,30 +991,41 @@ const CFG = {
   NFT_BONUS_PER: 5,
 
   // ══════════════════════════════════════════════
-  // ★ 참가권 NFT 설정 — 아래 3가지를 입력하세요
+  // ★ 참가권 NFT 설정
+  // ══════════════════════════════════════════════
+  TICKET_RECEIVER: 'tjcaradmin.wam',   // ★ 변경 필요
+  TICKET_SCHEMA: '',
+  TICKET_TEMPLATE_ID: 0,
+  TICKET_MODE: false,
+  TICKET_MEMO: 'TJCAR야찌 게임 참가권',
+
+  // ══════════════════════════════════════════════
+  // ★ 수상 NFT 설정 — 운영자가 WAX 로그인 후 지급
   // ══════════════════════════════════════════════
 
-  // 참가권을 받을 WAX 계정 주소 (운영자 계정)
-  // 예) 'tjcaradmin.wam'  또는 본인 WAX 계정명
-  TICKET_RECEIVER: 'tjcaradmin.wam',   // ★ 변경 필요
+  // 수상 NFT를 보유한 운영자 WAX 계정
+  // 이 계정으로 WAX 로그인해야 지급 버튼이 활성화됩니다
+  AWARD_OPERATOR: 'tjcaradmin.wam',    // ★ 운영자 WAX 계정명으로 변경
 
-  // 참가권 NFT 스키마명
-  // AtomicHub → 내 컬렉션 → Schemas 탭에서 확인
-  // 미정이면 '' 로 두면 컬렉션 전체 NFT를 참가권으로 허용
-  TICKET_SCHEMA: '',                   // ★ 예) 'ticket' 또는 'entry'
+  // 🏆 단체전 우승 NFT 템플릿 ID
+  // AtomicHub → 내 컬렉션 → Templates 탭에서 확인
+  // 0 이면 해당 NFT 지급 비활성화
+  AWARD_WINNER_TEMPLATE: 0,           // ★ 예) 654321
 
-  // 참가권 NFT 템플릿 ID (더 정확한 필터링)
-  // AtomicHub → 내 컬렉션 → Templates 탭에서 숫자 ID 확인
-  // 미정이면 0 으로 두면 스키마 기준으로만 필터링
-  TICKET_TEMPLATE_ID: 0,              // ★ 예) 123456
+  // 🎉 야찌 달성 NFT 템플릿 ID
+  AWARD_YAHTZEE_TEMPLATE: 0,          // ★ 예) 654322
 
-  // 참가권 모드 활성화 여부
-  // true  = WAX 로그인 사용자는 참가권 NFT 전송 필요
-  // false = 참가권 없이 자유 참가 (기존 방식)
-  TICKET_MODE: false,                  // ★ 운용 시작 시 true 로 변경
+  // 🥈 2위 NFT 템플릿 ID
+  AWARD_SECOND_TEMPLATE: 0,           // ★ 예) 654323
 
-  // 참가권 메모 (트랜잭션에 기록되는 텍스트)
-  TICKET_MEMO: 'TJCAR야찌 게임 참가권',
+  // 🎲 참가 기념 NFT 템플릿 ID
+  AWARD_PARTICIPATE_TEMPLATE: 0,      // ★ 예) 654324
+
+  // 수상 NFT 전송 메모
+  AWARD_MEMO_WINNER:      'TJCAR야찌 우승 축하합니다! 🏆',
+  AWARD_MEMO_YAHTZEE:     'TJCAR야찌 야찌 달성! 🎉 해피야찌 NFT',
+  AWARD_MEMO_SECOND:      'TJCAR야찌 2위 입상 🥈',
+  AWARD_MEMO_PARTICIPATE: 'TJCAR야찌 참가 기념 🎲',
 
   // 아래 항목은 변경 불필요 (공개 API 엔드포인트)
   WAX_RPC:     'https://wax.greymass.com',
@@ -1793,6 +1878,13 @@ function endGame(){
   } else {
     postSec.style.display = 'none';
   }
+
+  // 🟠 수상 NFT 지급 섹션 — 멀티플레이 게임일 때만 표시
+  if(G.mode === 'multi' || (G.mode === 'solo' && G.players.some(p => p.waxAccount))) {
+    renderAwardSection(ranked);
+  } else {
+    document.getElementById('awardSection').style.display = 'none';
+  }
 }
 
 function renderResult(ranked){
@@ -1892,6 +1984,279 @@ function saveImg(){
   html2canvas(tgt,{backgroundColor:'#080810',scale:2,useCORS:true,logging:false})
     .then(c=>{const a=document.createElement('a');a.download=`tjcar_${Date.now()}.png`;a.href=c.toDataURL('image/png');a.click();toast('이미지 저장됨!');})
     .catch(()=>toast('이미지 저장 실패'));
+}
+
+// ═══════════════════════════════════════════════
+// 🟠 수상 NFT 지급 시스템 (운영자 WAX 로그인 방식)
+// ═══════════════════════════════════════════════
+
+// 수상 항목 정의
+function buildAwardItems(ranked) {
+  const items = [];
+
+  // 🏆 단체전 우승 (1위) — WAX 계정이 있는 경우만
+  const winner = ranked[0];
+  items.push({
+    id:         'winner',
+    medal:      '🏆',
+    label:      '단체전 우승',
+    player:     winner.name,
+    waxAccount: winner.waxAccount || '',
+    templateId: CFG.AWARD_WINNER_TEMPLATE,
+    memo:       CFG.AWARD_MEMO_WINNER,
+    txId:       null,
+    skipped:    false,
+  });
+
+  // 🥈 2위
+  if(ranked.length >= 2) {
+    const second = ranked[1];
+    items.push({
+      id:         'second',
+      medal:      '🥈',
+      label:      '2위 입상',
+      player:     second.name,
+      waxAccount: second.waxAccount || '',
+      templateId: CFG.AWARD_SECOND_TEMPLATE,
+      memo:       CFG.AWARD_MEMO_SECOND,
+      txId:       null,
+      skipped:    false,
+    });
+  }
+
+  // 🎉 야찌 달성자 (중복 가능)
+  const yahtzeeers = ranked.filter(p => p.yahtzee && p.waxAccount);
+  yahtzeeers.forEach((p, i) => {
+    items.push({
+      id:         'yahtzee_' + i,
+      medal:      '🎉',
+      label:      '해피야찌 달성',
+      player:     p.name,
+      waxAccount: p.waxAccount || '',
+      templateId: CFG.AWARD_YAHTZEE_TEMPLATE,
+      memo:       CFG.AWARD_MEMO_YAHTZEE,
+      txId:       null,
+      skipped:    false,
+    });
+  });
+
+  // 🎲 참가 기념 (WAX 계정 보유자 전원)
+  ranked.forEach((p, i) => {
+    if(p.waxAccount) {
+      items.push({
+        id:         'participate_' + i,
+        medal:      '🎲',
+        label:      '참가 기념',
+        player:     p.name,
+        waxAccount: p.waxAccount,
+        templateId: CFG.AWARD_PARTICIPATE_TEMPLATE,
+        memo:       CFG.AWARD_MEMO_PARTICIPATE,
+        txId:       null,
+        skipped:    false,
+      });
+    }
+  });
+
+  return items;
+}
+
+// 현재 수상 목록 상태
+let AWARD_ITEMS = [];
+
+// ── 결과 화면에 수상 섹션 렌더 ──
+function renderAwardSection(ranked) {
+  const section  = document.getElementById('awardSection');
+  const isOp = AUTH.waxUser?.account === CFG.AWARD_OPERATOR;
+
+  AWARD_ITEMS = buildAwardItems(ranked);
+
+  // 수상 목록이 없으면 섹션 숨김
+  if(AWARD_ITEMS.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  // 운영자 배너
+  const opBanner = document.getElementById('awardOperatorBanner');
+  const allWrap  = document.getElementById('awardAllWrap');
+  document.getElementById('awardOperatorName').textContent = CFG.AWARD_OPERATOR;
+
+  if(isOp) {
+    opBanner.style.display = 'none';
+    allWrap.style.display  = 'block';
+  } else {
+    opBanner.style.display = 'block';
+    allWrap.style.display  = 'none';
+  }
+
+  renderAwardList(isOp);
+}
+
+// ── 수상 목록 렌더 ──
+function renderAwardList(isOperator) {
+  const list = document.getElementById('awardList');
+  list.innerHTML = AWARD_ITEMS.map((item, idx) => {
+    const hasWax      = !!item.waxAccount;
+    const hasTemplate = item.templateId > 0;
+    const isSent      = !!item.txId;
+    const isSkipped   = item.skipped;
+
+    let btnHtml = '';
+    if(!isOperator) {
+      // 운영자 미로그인 → 버튼 비활성
+      btnHtml = `<button class="award-btn award-btn-notemplate" disabled>
+        ${!hasWax ? '⚠️ WAX 없음' : !hasTemplate ? '⏳ 준비중' : '🔒 운영자 전용'}
+      </button>`;
+    } else if(isSent) {
+      btnHtml = `<button class="award-btn award-btn-sent">✅ 전송완료</button>`;
+    } else if(isSkipped) {
+      btnHtml = `<button class="award-btn award-btn-skip"
+        onclick="unskipAward(${idx})">↩ 취소</button>`;
+    } else if(!hasWax) {
+      btnHtml = `<button class="award-btn award-btn-notemplate" disabled>⚠️ WAX 주소 없음</button>`;
+    } else if(!hasTemplate) {
+      btnHtml = `<button class="award-btn award-btn-notemplate" disabled>⏳ 템플릿 미설정</button>`;
+    } else {
+      btnHtml = `
+        <div style="display:flex;gap:4px;">
+          <button class="award-btn award-btn-skip"
+            onclick="skipAward(${idx})">건너뜀</button>
+          <button class="award-btn award-btn-send" id="awardBtn_${idx}"
+            onclick="sendSingleAward(${idx})">🟠 지급</button>
+        </div>`;
+    }
+
+    return `
+      <div class="award-item ${isSent?'sent':''} ${isSkipped?'skipped':''}" id="awardItem_${idx}">
+        <div class="award-medal">${item.medal}</div>
+        <div class="award-info">
+          <div class="award-player">@${item.player}</div>
+          <div class="award-nft-name">${item.label} NFT${hasTemplate?' (Template #'+item.templateId+')':''}</div>
+          <div class="award-wax-addr">${hasWax ? '🟠 '+item.waxAccount : '❌ WAX 계정 없음'}</div>
+          ${isSent ? `<a class="award-tx-link"
+            href="https://waxblock.io/transaction/${item.txId}" target="_blank">
+            트랜잭션 확인 →
+          </a>` : ''}
+        </div>
+        ${btnHtml}
+      </div>`;
+  }).join('');
+}
+
+function skipAward(idx) {
+  AWARD_ITEMS[idx].skipped = true;
+  renderAwardList(true);
+}
+function unskipAward(idx) {
+  AWARD_ITEMS[idx].skipped = false;
+  renderAwardList(true);
+}
+
+// ── 단일 NFT 지급 ──
+async function sendSingleAward(idx) {
+  const item = AWARD_ITEMS[idx];
+  if(!item || !item.waxAccount || !item.templateId) return;
+
+  const btn = document.getElementById('awardBtn_' + idx);
+  if(btn) { btn.disabled = true; btn.textContent = '⏳'; }
+
+  try {
+    const txId = await mintAndSendAwardNFT(item);
+    item.txId = txId;
+    renderAwardList(true);
+    toast(`✅ ${item.player}에게 ${item.label} NFT 전송 완료!`);
+  } catch(e) {
+    if(btn) { btn.disabled = false; btn.textContent = '🟠 지급'; }
+    const msg = e.message || '';
+    if(msg.includes('cancel') || msg.includes('closed')) {
+      toast('전송이 취소되었습니다');
+    } else {
+      toast('❌ 전송 실패: ' + msg.substring(0, 60));
+    }
+  }
+}
+
+// ── 전체 일괄 지급 ──
+async function sendAllAwards() {
+  const pending = AWARD_ITEMS.filter(
+    i => !i.txId && !i.skipped && i.waxAccount && i.templateId > 0
+  );
+  if(pending.length === 0) { toast('전송할 NFT가 없습니다'); return; }
+
+  const allBtn   = document.getElementById('awardAllBtn');
+  const progress = document.getElementById('awardProgress');
+  const progBar  = document.getElementById('awardProgressInner');
+  allBtn.disabled = true;
+  allBtn.textContent = `⏳ 전송 중... (0/${pending.length})`;
+  progress.style.display = 'block';
+
+  let done = 0;
+  for(const item of pending) {
+    allBtn.textContent = `⏳ 전송 중... (${done}/${pending.length}) @${item.player}`;
+    try {
+      const txId = await mintAndSendAwardNFT(item);
+      item.txId = txId;
+      done++;
+      progBar.style.width = Math.round(done / pending.length * 100) + '%';
+      renderAwardList(true);
+      toast(`✅ @${item.player} → ${item.label} NFT 전송!`);
+      // 연속 트랜잭션 간격
+      if(done < pending.length) await new Promise(r => setTimeout(r, 1200));
+    } catch(e) {
+      const msg = e.message || '';
+      if(msg.includes('cancel') || msg.includes('closed')) {
+        toast('전송 취소됨 — 나머지는 개별 전송을 이용하세요');
+        break;
+      }
+      toast(`❌ @${item.player} 전송 실패: ${msg.substring(0,50)}`);
+    }
+  }
+
+  allBtn.disabled = false;
+  allBtn.textContent = done === pending.length
+    ? '✅ 전체 전송 완료!' : `🟠 나머지 ${pending.length - done}개 재시도`;
+}
+
+// ── WAX atomicassets::mintasset 또는 transfer 트랜잭션 ──
+// 운영자 보유 NFT 전송 방식 (transfer)
+// 민팅 방식은 컨트랙트 설정 필요 → 여기서는 transfer 방식 사용
+async function mintAndSendAwardNFT(item) {
+  const wax = getWAX();
+  if(!wax || !wax.api) throw new Error('WAX 지갑 연결 필요. 다시 로그인해 주세요.');
+
+  // 운영자 계정이 보유한 해당 템플릿의 NFT 조회
+  const url = `${CFG.ATOMIC_API}/atomicassets/v1/assets`
+    + `?owner=${encodeURIComponent(CFG.AWARD_OPERATOR)}`
+    + `&collection_name=${CFG.WAX_COLLECTION}`
+    + `&template_id=${item.templateId}`
+    + `&limit=1&page=1`;
+
+  const res  = await fetch(url);
+  const data = await res.json();
+
+  if(!data.success || !data.data || data.data.length === 0) {
+    throw new Error(
+      `운영자 계정(${CFG.AWARD_OPERATOR})에 Template #${item.templateId} NFT가 없습니다.\n`
+      + 'AtomicHub에서 해당 NFT를 운영자 계정으로 먼저 발행/구입해 주세요.'
+    );
+  }
+
+  const assetId = data.data[0].asset_id;
+
+  // atomicassets::transfer
+  const result = await wax.api.transact({
+    actions: [{
+      account:       'atomicassets',
+      name:          'transfer',
+      authorization: [{ actor: CFG.AWARD_OPERATOR, permission: 'active' }],
+      data: {
+        from:      CFG.AWARD_OPERATOR,
+        to:        item.waxAccount,
+        asset_ids: [assetId],
+        memo:      item.memo,
+      },
+    }]
+  }, { blocksBehind: 3, expireSeconds: 30 });
+
+  return result?.transaction_id || result?.processed?.id || 'tx_ok';
 }
 
 // ═══════════════════════════════════════════════
