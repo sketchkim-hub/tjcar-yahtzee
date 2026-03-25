@@ -6,8 +6,8 @@
 <title>TJCAR야찌 🎲 × Steem × WAX</title>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<!-- WAX Cloud Wallet JS SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@waxio/waxjs/dist/wax.min.js"></script>
+<!-- WAX Cloud Wallet JS SDK (wax-io/waxjs 정식 패키지) -->
+<script src="https://cdn.jsdelivr.net/npm/@wax-io/waxjs@1.2.2/dist/wax.js"></script>
 
 <!-- =====================================================
   ★ Google AdSense 삽입 위치 (1) — <head> 자동광고 코드
@@ -496,7 +496,8 @@ input[type=password]:focus{border-color:var(--steem);}
         <div class="ibox ibox-wax">
           🟠 <b>WAX Cloud Wallet</b>로 로그인합니다.<br>
           AtomicHub에 등록된 TJCAR야찌 NFT를 자동으로 불러옵니다.<br>
-          <a href="https://wallet.wax.io" target="_blank">WAX 지갑 만들기 →</a>
+          <a href="https://www.mycloudwallet.com" target="_blank">WAX 지갑 만들기 (mycloudwallet) →</a><br>
+          <span style="font-size:0.68rem;opacity:0.75;">⚠️ 로그인 팝업이 뜨면 반드시 허용해 주세요</span>
         </div>
         <div class="pbar pbar-wax" id="wax-bar"><div class="pbar-inner" id="wax-bi"></div></div>
         <button class="btn btn-wax" id="wax-btn" onclick="loginWAX()">🟠 WAX Cloud Wallet 로그인</button>
@@ -915,18 +916,127 @@ let AUTH = {
   get loggedIn() { return !!(this.steemUser || this.waxUser); },
 };
 
-// WAX JS instance (lazy)
+// WAX JS instance (lazy) — mycloudwallet.com 기반
 let _wax = null;
 function getWAX() {
-  if(!_wax) {
-    try {
-      _wax = new waxjs.WaxJS({ rpcEndpoint: CFG.WAX_RPC, tryAutoLogin: false });
-    } catch(e) { _wax = null; }
+  if(_wax) return _wax;
+  try {
+    // wax-io/waxjs v1.2+ 올바른 초기화 방법
+    // mycloudwallet.com = 구 wallet.wax.io 의 새 주소
+    if(typeof WaxJS !== 'undefined') {
+      _wax = new WaxJS({
+        rpcEndpoint: CFG.WAX_RPC,
+        userAccount: undefined,
+        pubKeys: undefined,
+        tryAutoLogin: false,
+      });
+    } else if(typeof waxjs !== 'undefined' && waxjs.WaxJS) {
+      _wax = new waxjs.WaxJS({
+        rpcEndpoint: CFG.WAX_RPC,
+        tryAutoLogin: false,
+      });
+    } else {
+      return null;
+    }
+  } catch(e) {
+    console.warn('WAX SDK 초기화 실패:', e.message);
+    _wax = null;
   }
   return _wax;
 }
 
-// ─── Tab ───
+// ════════════════════════════════════════════════
+// WAX LOGIN
+// ════════════════════════════════════════════════
+async function loginWAX() {
+  const btn = document.getElementById('wax-btn');
+  btn.disabled = true;
+  prog('wax', 10);
+  smsg('wax', 'WAX Cloud Wallet 연결 중...', 'rgba(248,190,100,0.85)');
+
+  try {
+    const wax = getWAX();
+
+    // SDK 로드 확인
+    if(!wax) {
+      // SDK가 없으면 mycloudwallet 직접 팝업으로 대체
+      throw new Error('SDK_MISSING');
+    }
+
+    prog('wax', 30);
+    smsg('wax', '지갑 팝업이 열립니다... (팝업 차단 해제 필요)', 'rgba(248,190,100,0.85)');
+
+    const account = await wax.login();
+
+    if(!account) throw new Error('계정 정보를 받지 못했습니다');
+
+    prog('wax', 65);
+    smsg('wax', 'NFT 불러오는 중...', 'rgba(248,190,100,0.85)');
+    AUTH.waxUser = { account, avatar: '' };
+    await loadWAXNFTs(account);
+    prog('wax', 100);
+    setTimeout(() => { progHide('wax'); btn.disabled = false; onLogin(); }, 280);
+
+  } catch(e) {
+    progHide('wax');
+    btn.disabled = false;
+
+    if(e.message === 'SDK_MISSING') {
+      // SDK 미로드 → 수동 계정명 입력 모드로 전환
+      showWAXManualInput();
+    } else if(e.message.includes('closed') || e.message.includes('cancel') ||
+              e.message.includes('User closed') || e.message.includes('Modal closed')) {
+      smsg('wax', '로그인이 취소되었습니다.', 'rgba(255,150,80,0.9)');
+    } else if(e.message.includes('popup') || e.message.includes('Popup')) {
+      smsg('wax', '⚠️ 팝업이 차단되었습니다. 브라우저 주소창 오른쪽의 팝업 차단 아이콘을 클릭해 허용해 주세요.',
+        'rgba(255,150,80,0.9)');
+    } else {
+      smsg('wax', `WAX 오류: ${e.message}`, 'rgba(255,110,110,0.9)');
+    }
+  }
+}
+
+// SDK 로드 실패 시 — 계정명 직접 입력으로 대체
+function showWAXManualInput() {
+  const panel = document.getElementById('panel-wax');
+  const existing = document.getElementById('wax-manual-wrap');
+  if(existing) { existing.style.display='flex'; return; }
+
+  const wrap = document.createElement('div');
+  wrap.id = 'wax-manual-wrap';
+  wrap.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+  wrap.innerHTML = `
+    <div class="ibox ibox-warn" style="font-size:0.72rem;">
+      ⚠️ WAX SDK 자동 로드에 실패했습니다.<br>
+      WAX 계정명을 직접 입력해 NFT 조회만 진행할 수 있습니다.<br>
+      (게임 내 NFT 보너스 적용 가능, 트랜잭션 서명은 불가)
+    </div>
+    <div class="ig">
+      <label>WAX 계정명</label>
+      <input type="text" id="wax-manual-account"
+        placeholder="예: myaccount.wam"
+        style="font-size:0.88rem;"
+        onkeydown="if(event.key==='Enter')loginWAXManual()">
+    </div>
+    <button class="btn btn-wax btn-sm" onclick="loginWAXManual()">
+      🟠 계정명으로 NFT 조회
+    </button>`;
+  panel.appendChild(wrap);
+}
+
+async function loginWAXManual() {
+  const input = document.getElementById('wax-manual-account');
+  if(!input) return;
+  const account = input.value.trim().toLowerCase();
+  if(!account) { toast('WAX 계정명을 입력하세요'); return; }
+
+  smsg('wax', 'NFT 조회 중...', 'rgba(248,190,100,0.85)');
+  prog('wax', 40);
+  AUTH.waxUser = { account, avatar: '' };
+  await loadWAXNFTs(account);
+  prog('wax', 100);
+  setTimeout(() => { progHide('wax'); onLogin(); }, 280);
+}
 function switchTab(t) {
   const map = { kc:'active-steem', pk:'active-steem', wax:'active-wax', gu:'active-guest' };
   ['kc','pk','wax','gu'].forEach(k => {
@@ -1021,15 +1131,29 @@ async function loginWAX() {
 // Connect WAX as secondary (after Steem login)
 async function connectWAXExtra() {
   try {
-    const wax=getWAX(); if(!wax) throw new Error('wax.js 로드 실패');
-    toast('WAX Cloud Wallet 연결 중...');
+    const wax = getWAX();
+    if(!wax) {
+      // SDK 없으면 수동 입력 모드
+      const account = prompt('WAX 계정명을 입력하세요 (예: myaccount.wam)');
+      if(!account) return;
+      AUTH.waxUser = { account: account.trim().toLowerCase(), avatar: '' };
+      await loadWAXNFTs(AUTH.waxUser.account);
+      buildLobbyProfile();
+      toast(`WAX @${AUTH.waxUser.account} 연결됨! NFT 보너스 +${AUTH.waxNFTBonus}점`);
+      return;
+    }
+    toast('WAX Cloud Wallet 연결 중... (팝업 허용 필요)');
     const account = await wax.login();
-    AUTH.waxUser = { account, avatar:'' };
+    AUTH.waxUser = { account, avatar: '' };
     await loadWAXNFTs(account);
     buildLobbyProfile();
     toast(`WAX @${account} 연결됨! NFT 보너스 +${AUTH.waxNFTBonus}점`);
   } catch(e) {
-    toast('WAX 연결 실패: '+e.message);
+    if(e.message.includes('closed') || e.message.includes('cancel') || e.message.includes('Modal')) {
+      toast('WAX 로그인 취소됨');
+    } else {
+      toast('WAX 연결 실패: ' + e.message);
+    }
   }
 }
 
