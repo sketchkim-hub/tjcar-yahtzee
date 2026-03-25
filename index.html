@@ -328,7 +328,60 @@ input[type=password]:focus{border-color:var(--steem);}
   padding:6px 11px;font-size:0.68rem;color:rgba(77,185,245,0.8);flex-shrink:0;}
 .sc-view-banner.show{display:flex;}
 
-/* ═══ RESULT ═══ */
+/* ═══ NFT 참가권 모달 ═══ */
+.ticket-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
+.ticket-modal-overlay.open{display:flex;}
+.ticket-modal{background:var(--card);border:1px solid rgba(248,152,34,0.35);
+  border-radius:20px;padding:24px;width:100%;max-width:400px;
+  box-shadow:0 0 40px rgba(248,152,34,0.15);}
+.ticket-modal-title{font-family:'Black Han Sans',sans-serif;font-size:1.4rem;
+  background:linear-gradient(135deg,var(--wax),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:4px;}
+.ticket-modal-sub{font-size:0.75rem;color:var(--text-dim);margin-bottom:16px;line-height:1.6;}
+
+/* 참가권 NFT 카드 그리드 */
+.ticket-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  max-height:280px;overflow-y:auto;margin-bottom:14px;}
+.ticket-card{border-radius:10px;overflow:hidden;
+  border:2px solid var(--border);cursor:pointer;transition:all 0.18s;
+  background:#0a0a18;position:relative;}
+.ticket-card:hover{border-color:var(--wax);transform:scale(1.04);}
+.ticket-card.selected{border-color:var(--accent3);
+  box-shadow:0 0 12px rgba(6,214,160,0.4);}
+.ticket-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;}
+.ticket-card .tc-name{font-size:0.58rem;color:var(--text-dim);
+  padding:4px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ticket-card .tc-id{font-size:0.55rem;color:var(--wax);padding:0 5px 4px;}
+.ticket-card .tc-check{position:absolute;top:4px;right:4px;
+  width:18px;height:18px;border-radius:50%;background:var(--accent3);
+  display:none;align-items:center;justify-content:center;font-size:0.65rem;}
+.ticket-card.selected .tc-check{display:flex;}
+
+/* 전송 상태 표시 */
+.ticket-status{border-radius:10px;padding:10px 13px;font-size:0.75rem;
+  line-height:1.7;margin-bottom:10px;display:none;}
+.ticket-status.show{display:block;}
+.ticket-status-pending{background:rgba(248,152,34,0.08);
+  border:1px solid rgba(248,152,34,0.25);color:rgba(248,190,100,0.9);}
+.ticket-status-success{background:rgba(6,214,160,0.08);
+  border:1px solid rgba(6,214,160,0.25);color:var(--accent3);}
+.ticket-status-error{background:rgba(255,77,109,0.08);
+  border:1px solid rgba(255,77,109,0.25);color:var(--accent);}
+
+/* 로비 참가권 상태 배너 */
+.ticket-banner{display:flex;align-items:center;gap:9px;
+  border-radius:11px;padding:10px 13px;margin-bottom:2px;}
+.ticket-banner-have{background:rgba(6,214,160,0.07);
+  border:1px solid rgba(6,214,160,0.22);}
+.ticket-banner-none{background:rgba(255,77,109,0.07);
+  border:1px solid rgba(255,77,109,0.22);}
+.ticket-banner-off{background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);}
+.tb-icon{font-size:1.2rem;flex-shrink:0;}
+.tb-text{flex:1;font-size:0.75rem;line-height:1.6;}
+.tb-count{font-family:'Black Han Sans',sans-serif;font-size:1rem;flex-shrink:0;}
 #result{align-items:center;justify-content:flex-start;padding:20px;overflow-y:auto;}
 .result-card{background:var(--card);border:1px solid var(--border);border-radius:20px;
   padding:22px;width:100%;max-width:440px;margin:0 auto;}
@@ -558,16 +611,20 @@ input[type=password]:focus{border-color:var(--steem);}
           🟠 WAX 지갑 추가 연결 (NFT 보너스)
         </button>
       </div>
-      <button class="btn btn-primary" onclick="startSolo()">🤖 혼자서 플레이 (AI 대전)</button>
+
+      <!-- ══ 참가권 NFT 상태 배너 ══ -->
+      <div id="ticketBanner" style="display:none;"></div>
+
+      <button class="btn btn-primary" onclick="checkTicketThenStart('solo')">🤖 혼자서 플레이 (AI 대전)</button>
       <div class="divider"><span>멀티플레이어</span></div>
-      <button class="btn btn-yellow" onclick="createRoom()">🏠 방 만들기 (2~6명)</button>
+      <button class="btn btn-yellow" onclick="checkTicketThenStart('create')">🏠 방 만들기 (2~6명)</button>
       <div class="ig">
         <label>초대 코드</label>
         <input type="text" id="roomCodeInput" placeholder="6자리 코드"
           maxlength="6" style="text-transform:uppercase;letter-spacing:4px;text-align:center;"
-          onkeydown="if(event.key==='Enter')joinRoom()">
+          onkeydown="if(event.key==='Enter')checkTicketThenStart('join')">
       </div>
-      <button class="btn btn-osteem" onclick="joinRoom()">🔗 방 참가하기</button>
+      <button class="btn btn-osteem" onclick="checkTicketThenStart('join')">🔗 방 참가하기</button>
       <div class="divider"><span>기록</span></div>
       <button class="btn btn-ghost btn-sm" onclick="showLB()">🏆 리더보드</button>
     </div>
@@ -724,7 +781,60 @@ input[type=password]:focus{border-color:var(--steem);}
   </div>
 </div>
 
-<!-- 포스팅키 재입력 모달 (포스팅키 로그인 사용자가 게임 종료 후 포스팅 시) -->
+<!-- ════════ 참가권 NFT 전송 모달 ════════ -->
+<div class="ticket-modal-overlay" id="ticketModal">
+  <div class="ticket-modal">
+    <div class="ticket-modal-title">🎟️ 참가권 NFT 전송</div>
+    <div class="ticket-modal-sub" id="ticketModalSub">
+      게임에 참가하려면 참가권 NFT를 전송해야 합니다.<br>
+      전송된 NFT는 반환되지 않습니다 (소각 방식).
+    </div>
+
+    <!-- 참가권 NFT 없을 때 -->
+    <div id="ticketNoNFT" style="display:none;">
+      <div class="ibox ibox-err" style="margin-bottom:12px;">
+        ⚠️ 보유한 참가권 NFT가 없습니다.<br>
+        <a href="https://wax.atomichub.io/market?collection_name=tjcaryahtzee"
+           target="_blank" style="color:var(--wax);">
+          AtomicHub에서 구매하기 →
+        </a>
+      </div>
+    </div>
+
+    <!-- 참가권 NFT 목록 -->
+    <div id="ticketHasNFT" style="display:none;">
+      <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">
+        전송할 참가권을 선택하세요
+        <span id="ticketSelectedCount"
+          style="color:var(--accent3);font-weight:700;margin-left:4px;"></span>
+      </div>
+      <div class="ticket-grid" id="ticketGrid"></div>
+    </div>
+
+    <!-- 전송 상태 표시 -->
+    <div class="ticket-status" id="ticketStatus"></div>
+
+    <!-- 전송 대상 정보 -->
+    <div style="font-size:0.65rem;color:var(--text-dim);margin-bottom:12px;
+                background:#0a0a18;border-radius:7px;padding:7px 10px;">
+      📤 전송 대상:
+      <span style="color:var(--wax);font-weight:700;" id="ticketReceiverDisp"></span><br>
+      📝 메모: <span style="color:var(--text-dim);" id="ticketMemoDisp"></span>
+    </div>
+
+    <!-- 버튼 -->
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-ghost btn-sm" style="flex:1;"
+        onclick="closeTicketModal()">취소</button>
+      <button class="btn btn-wax" style="flex:2;" id="ticketSendBtn"
+        onclick="sendTicketNFT()" disabled>
+        🎟️ 전송하고 참가하기
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 포스팅키 재입력 모달 -->
 <div class="modal-overlay" id="reenterModal">
   <div class="modal">
     <h3>🔑 포스팅 키 확인</h3>
@@ -805,6 +915,32 @@ const CFG = {
 
   // ★ NFT 1개 보유 시 추가되는 보너스 점수 (원하는 숫자로 변경)
   NFT_BONUS_PER: 5,
+
+  // ══════════════════════════════════════════════
+  // ★ 참가권 NFT 설정 — 아래 3가지를 입력하세요
+  // ══════════════════════════════════════════════
+
+  // 참가권을 받을 WAX 계정 주소 (운영자 계정)
+  // 예) 'tjcaradmin.wam'  또는 본인 WAX 계정명
+  TICKET_RECEIVER: 'tjcaradmin.wam',   // ★ 변경 필요
+
+  // 참가권 NFT 스키마명
+  // AtomicHub → 내 컬렉션 → Schemas 탭에서 확인
+  // 미정이면 '' 로 두면 컬렉션 전체 NFT를 참가권으로 허용
+  TICKET_SCHEMA: '',                   // ★ 예) 'ticket' 또는 'entry'
+
+  // 참가권 NFT 템플릿 ID (더 정확한 필터링)
+  // AtomicHub → 내 컬렉션 → Templates 탭에서 숫자 ID 확인
+  // 미정이면 0 으로 두면 스키마 기준으로만 필터링
+  TICKET_TEMPLATE_ID: 0,              // ★ 예) 123456
+
+  // 참가권 모드 활성화 여부
+  // true  = WAX 로그인 사용자는 참가권 NFT 전송 필요
+  // false = 참가권 없이 자유 참가 (기존 방식)
+  TICKET_MODE: false,                  // ★ 운용 시작 시 true 로 변경
+
+  // 참가권 메모 (트랜잭션에 기록되는 텍스트)
+  TICKET_MEMO: 'TJCAR야찌 게임 참가권',
 
   // 아래 항목은 변경 불필요 (공개 API 엔드포인트)
   WAX_RPC:     'https://wax.greymass.com',
@@ -1216,6 +1352,7 @@ function onLogin() {
     localStorage.setItem('tjcar_lastUser', AUTH.steemUser.username);
   toast(`환영합니다, @${AUTH.username}!`);
   buildLobbyProfile();
+  updateTicketBanner();
   showScreen('lobby');
 }
 
@@ -1276,8 +1413,8 @@ function buildLobbyProfile() {
     (AUTH.steemUser && !AUTH.waxUser && AUTH.steemUser.method!=='guest') ? 'block' : 'none';
 }
 
-function logoutSteem(){AUTH.steemUser=null;if(!AUTH.waxUser){showScreen('loginScreen');} else buildLobbyProfile();}
-function logoutWAX(){AUTH.waxUser=null;AUTH.waxNFTs=[];AUTH.waxNFTBonus=0;buildLobbyProfile();}
+function logoutSteem(){AUTH.steemUser=null;if(!AUTH.waxUser){showScreen('loginScreen');} else {buildLobbyProfile();updateTicketBanner();}}
+function logoutWAX(){AUTH.waxUser=null;AUTH.waxNFTs=[];AUTH.waxNFTBonus=0;TICKET_STATE.txId=null;buildLobbyProfile();updateTicketBanner();}
 
 // NFT modal
 function showNFTModal() {
@@ -1755,6 +1892,276 @@ function saveImg(){
   html2canvas(tgt,{backgroundColor:'#080810',scale:2,useCORS:true,logging:false})
     .then(c=>{const a=document.createElement('a');a.download=`tjcar_${Date.now()}.png`;a.href=c.toDataURL('image/png');a.click();toast('이미지 저장됨!');})
     .catch(()=>toast('이미지 저장 실패'));
+}
+
+// ═══════════════════════════════════════════════
+// 🎟️ 참가권 NFT 전송 시스템
+// ═══════════════════════════════════════════════
+
+// 현재 세션에서 전송 완료된 트랜잭션 ID 보관
+let TICKET_STATE = {
+  txId: null,          // 성공한 트랜잭션 ID
+  usedAssetId: null,   // 사용한 NFT asset_id
+  pendingAction: null, // 전송 후 실행할 액션: 'solo'|'create'|'join'
+  tickets: [],         // 보유 참가권 목록
+  selected: null,      // 선택된 NFT asset_id
+};
+
+// ── 참가권 보유 NFT 필터링 ──
+function getTicketNFTs() {
+  return AUTH.waxNFTs.filter(n => {
+    // 템플릿 ID 설정된 경우 정확히 일치
+    if(CFG.TICKET_TEMPLATE_ID > 0)
+      return String(n.template_id) === String(CFG.TICKET_TEMPLATE_ID);
+    // 스키마명 설정된 경우 스키마로 필터
+    if(CFG.TICKET_SCHEMA)
+      return n.schema === CFG.TICKET_SCHEMA;
+    // 둘 다 미설정 → 컬렉션 전체 NFT를 참가권으로 허용
+    return true;
+  });
+}
+
+// ── 로비 진입 시 참가권 배너 업데이트 ──
+function updateTicketBanner() {
+  const banner = document.getElementById('ticketBanner');
+  if(!banner) return;
+
+  // 참가권 모드 OFF 또는 WAX 로그인 안 한 경우
+  if(!CFG.TICKET_MODE) {
+    banner.style.display = 'none';
+    return;
+  }
+  if(!AUTH.waxUser) {
+    banner.style.display = 'block';
+    banner.innerHTML = `
+      <div class="ticket-banner ticket-banner-off">
+        <span class="tb-icon">🎟️</span>
+        <span class="tb-text">참가권 모드 활성화됨<br>
+          <span style="color:var(--wax);">WAX 지갑을 연결하면 참가권을 확인합니다</span>
+        </span>
+      </div>`;
+    return;
+  }
+
+  const tickets = getTicketNFTs();
+  banner.style.display = 'block';
+
+  // 이미 이 세션에서 전송 완료한 경우
+  if(TICKET_STATE.txId) {
+    banner.innerHTML = `
+      <div class="ticket-banner ticket-banner-have">
+        <span class="tb-icon">✅</span>
+        <span class="tb-text">참가권 전송 완료<br>
+          <a href="https://waxblock.io/transaction/${TICKET_STATE.txId}"
+             target="_blank" style="color:var(--accent3);font-size:0.68rem;">
+            트랜잭션 확인 →
+          </a>
+        </span>
+      </div>`;
+    return;
+  }
+
+  if(tickets.length > 0) {
+    banner.innerHTML = `
+      <div class="ticket-banner ticket-banner-have">
+        <span class="tb-icon">🎟️</span>
+        <span class="tb-text">참가권 보유 중<br>
+          <span style="font-size:0.68rem;color:var(--text-dim);">
+            게임 시작 시 참가권 1개가 전송됩니다
+          </span>
+        </span>
+        <span class="tb-count" style="color:var(--accent3);">${tickets.length}개</span>
+      </div>`;
+  } else {
+    banner.innerHTML = `
+      <div class="ticket-banner ticket-banner-none">
+        <span class="tb-icon">❌</span>
+        <span class="tb-text">참가권 NFT 없음<br>
+          <a href="https://wax.atomichub.io/market?collection_name=${CFG.WAX_COLLECTION}"
+             target="_blank" style="color:var(--accent);font-size:0.68rem;">
+            AtomicHub에서 구매하기 →
+          </a>
+        </span>
+        <span class="tb-count" style="color:var(--accent);">0개</span>
+      </div>`;
+  }
+}
+
+// ── 게임 시작 전 참가권 체크 ──
+function checkTicketThenStart(action) {
+  // 참가권 모드 OFF → 바로 게임 시작
+  if(!CFG.TICKET_MODE) {
+    doGameAction(action); return;
+  }
+  // WAX 로그인 안 한 경우 → 바로 시작 (스팀/게스트 유저 허용)
+  if(!AUTH.waxUser) {
+    doGameAction(action); return;
+  }
+  // 이미 이 세션에서 전송 완료 → 바로 시작
+  if(TICKET_STATE.txId) {
+    doGameAction(action); return;
+  }
+  // 참가권 확인 모달 열기
+  TICKET_STATE.pendingAction = action;
+  openTicketModal();
+}
+
+function doGameAction(action) {
+  if(action === 'solo')   startSolo();
+  else if(action === 'create') createRoom();
+  else if(action === 'join')   joinRoom();
+}
+
+// ── 참가권 모달 열기 ──
+async function openTicketModal() {
+  const modal = document.getElementById('ticketModal');
+  const status = document.getElementById('ticketStatus');
+  status.className = 'ticket-status';
+  status.style.display = 'none';
+
+  // 수신 계정 / 메모 표시
+  document.getElementById('ticketReceiverDisp').textContent = CFG.TICKET_RECEIVER;
+  document.getElementById('ticketMemoDisp').textContent = CFG.TICKET_MEMO;
+
+  // NFT 새로고침
+  document.getElementById('ticketHasNFT').style.display = 'none';
+  document.getElementById('ticketNoNFT').style.display = 'none';
+  document.getElementById('ticketSendBtn').disabled = true;
+  TICKET_STATE.selected = null;
+  TICKET_STATE.tickets = [];
+
+  modal.classList.add('open');
+
+  // 참가권 NFT 조회 (최신화)
+  if(AUTH.waxUser) {
+    await loadWAXNFTs(AUTH.waxUser.account);
+    TICKET_STATE.tickets = getTicketNFTs();
+  }
+
+  if(TICKET_STATE.tickets.length === 0) {
+    document.getElementById('ticketNoNFT').style.display = 'block';
+  } else {
+    document.getElementById('ticketHasNFT').style.display = 'block';
+    renderTicketGrid();
+  }
+}
+
+function closeTicketModal() {
+  document.getElementById('ticketModal').classList.remove('open');
+  TICKET_STATE.pendingAction = null;
+  TICKET_STATE.selected = null;
+}
+
+// ── 참가권 NFT 그리드 렌더 ──
+function renderTicketGrid() {
+  const grid = document.getElementById('ticketGrid');
+  grid.innerHTML = TICKET_STATE.tickets.map(n => `
+    <div class="ticket-card ${TICKET_STATE.selected === n.asset_id ? 'selected' : ''}"
+         onclick="selectTicket('${n.asset_id}')">
+      ${n.img
+        ? `<img src="${n.img}" alt="${n.name}"
+               onerror="this.style.background='var(--border)';this.style.minHeight='60px'">`
+        : `<div style="aspect-ratio:1;background:rgba(248,152,34,0.1);
+               display:flex;align-items:center;justify-content:center;font-size:2rem;">🎟️</div>`}
+      <div class="tc-name">${n.name || '참가권'}</div>
+      <div class="tc-id">#${n.asset_id}</div>
+      <div class="tc-check">✓</div>
+    </div>`).join('');
+  updateTicketCount();
+}
+
+function selectTicket(assetId) {
+  TICKET_STATE.selected = TICKET_STATE.selected === assetId ? null : assetId;
+  renderTicketGrid();
+  document.getElementById('ticketSendBtn').disabled = !TICKET_STATE.selected;
+}
+
+function updateTicketCount() {
+  const el = document.getElementById('ticketSelectedCount');
+  el.textContent = TICKET_STATE.selected ? '✓ 선택됨' : '';
+}
+
+// ── 참가권 NFT 전송 (WAX atomicassets transfer) ──
+async function sendTicketNFT() {
+  if(!TICKET_STATE.selected) { toast('참가권 NFT를 선택하세요'); return; }
+  if(!AUTH.waxUser) { toast('WAX 로그인이 필요합니다'); return; }
+
+  const btn = document.getElementById('ticketSendBtn');
+  const statusEl = document.getElementById('ticketStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ 전송 중...';
+
+  setTicketStatus('pending',
+    `⏳ WAX Cloud Wallet에서 서명 요청 중...<br>
+     지갑 팝업이 열리면 확인 후 승인해 주세요.`);
+
+  try {
+    const wax = getWAX();
+    if(!wax || !wax.api) throw new Error('WAX 지갑 연결이 필요합니다. 다시 로그인해 주세요.');
+
+    // atomicassets::transfer 트랜잭션 구성
+    const result = await wax.api.transact({
+      actions: [{
+        account: 'atomicassets',
+        name: 'transfer',
+        authorization: [{
+          actor: AUTH.waxUser.account,
+          permission: 'active',
+        }],
+        data: {
+          from:     AUTH.waxUser.account,
+          to:       CFG.TICKET_RECEIVER,
+          asset_ids: [TICKET_STATE.selected],
+          memo:     CFG.TICKET_MEMO,
+        },
+      }]
+    }, {
+      blocksBehind: 3,
+      expireSeconds: 30,
+    });
+
+    const txId = result?.transaction_id || result?.processed?.id || '확인불가';
+    TICKET_STATE.txId = txId;
+    TICKET_STATE.usedAssetId = TICKET_STATE.selected;
+
+    // NFT 목록에서 제거
+    AUTH.waxNFTs = AUTH.waxNFTs.filter(n => n.asset_id !== TICKET_STATE.selected);
+
+    setTicketStatus('success',
+      `✅ 전송 완료! 게임에 참가합니다.<br>
+       <a href="https://waxblock.io/transaction/${txId}"
+          target="_blank" style="color:var(--accent3);font-size:0.68rem;">
+         트랜잭션 확인 →
+       </a>`);
+
+    btn.textContent = '✅ 전송 완료';
+
+    // 0.8초 후 자동으로 게임 시작
+    setTimeout(() => {
+      document.getElementById('ticketModal').classList.remove('open');
+      updateTicketBanner();
+      doGameAction(TICKET_STATE.pendingAction);
+    }, 800);
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '🎟️ 전송하고 참가하기';
+
+    const msg = e.message || '';
+    if(msg.includes('cancel') || msg.includes('closed') || msg.includes('Modal')) {
+      setTicketStatus('error', '❌ 전송이 취소되었습니다.');
+    } else if(msg.includes('insufficient') || msg.includes('balance')) {
+      setTicketStatus('error', '❌ WAX 잔액이 부족합니다. (네트워크 수수료 필요)');
+    } else {
+      setTicketStatus('error', `❌ 전송 실패: ${msg}`);
+    }
+  }
+}
+
+function setTicketStatus(type, html) {
+  const el = document.getElementById('ticketStatus');
+  el.className = `ticket-status ticket-status-${type} show`;
+  el.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════
