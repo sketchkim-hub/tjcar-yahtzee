@@ -1004,14 +1004,13 @@ input[type=password]:focus{border-color:var(--steem);}
 
 const FIREBASE_CFG = {
   // ★ Firebase 콘솔에서 복사한 설정값으로 교체하세요
-  apiKey: "AIzaSyDbygdhOcpvQA9ZfAwwcggFVuWMFUEyMao",
-  authDomain: "tjcar-yahtzee.firebaseapp.com",
-  databaseURL: "https://tjcar-yahtzee-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "tjcar-yahtzee",
-  storageBucket: "tjcar-yahtzee.firebasestorage.app",
-  messagingSenderId: "206258520103",
-  appId: "1:206258520103:web:3ff14cf684a8ef19148e02",
-  measurementId: "G-SVF04C4WBL"
+  apiKey:            "여기에_apiKey",
+  authDomain:        "여기에_authDomain",
+  databaseURL:       "여기에_databaseURL",   // 반드시 입력! (Realtime DB URL)
+  projectId:         "여기에_projectId",
+  storageBucket:     "여기에_storageBucket",
+  messagingSenderId: "여기에_messagingSenderId",
+  appId:             "여기에_appId",
 };
 
 // Firebase 초기화 (databaseURL 없으면 로컬 모드로 fallback)
@@ -1698,6 +1697,8 @@ function createRoom(){
     // 로컬 fallback
     ROOMS[code] = { players:[mePlayer] };
     window._RC = code;
+    window._myName = n;
+    subscribeRoom(code); // BroadcastChannel 구독 시작
     renderWait(ROOMS[code].players);
     showScreen('waiting');
   }
@@ -1767,9 +1768,13 @@ function joinRoom(){
         ROOMS[code].players.push(mePlayer);
     }
     window._RC = code;
+    window._myName = n;
     document.getElementById('roomCodeDisp').textContent = code;
     document.getElementById('inviteLinkDisp').textContent =
       location.href.split('?')[0]+'?join='+code;
+    // BroadcastChannel 구독 시작 (방장 창에 내 참가를 알림)
+    subscribeRoom(code);
+    broadcastPlayers(ROOMS[code].players);
     renderWait(ROOMS[code].players);
     showScreen('waiting');
   }
@@ -1778,49 +1783,87 @@ function joinRoom(){
 // ─── Firebase 방 실시간 구독 ───
 let _roomListener = null;
 function subscribeRoom(code) {
-  // 이전 리스너 해제
   if(_roomListener) { _roomListener(); _roomListener = null; }
-
   const db = initFirebase();
-  if(!db) return;
 
-  const roomRef = db.ref('rooms/'+code);
-  const handler = roomRef.on('value', snap => {
-    const room = snap.val();
-    if(!room) return;
-    const players = Object.values(room.players || {});
-
-    // 대기실 UI 업데이트
-    if(document.getElementById('waiting').classList.contains('active')) {
-      updateWaitUI(code, players);
-    }
-
-    // 방장이 게임 시작 신호를 보냈을 때 → 참가자도 게임 시작
-    if(room.started && room.gameData) {
-      const myName = window._myName;
-      const myIdx  = players.findIndex(p => p.name === myName);
-      if(myIdx === -1) return; // 내가 없으면 무시
-
-      // 이미 게임 화면이면 중복 시작 방지
-      if(document.getElementById('game').classList.contains('active')) return;
-
-      // 게임 상태 복원 후 화면 전환
-      G = room.gameData;
-      // 방장이 아닌 참가자 — 게임 화면으로 이동
-      if(players[0].name !== myName) {
-        showScreen('game');
-        renderSC(); renderPtabs(); updateHeader();
-        document.getElementById('ptabs').style.display='flex';
-        document.getElementById('aiLogBox').style.display='block';
-        // 내 차례가 아닌 경우 주사위 비활성화
-        if(G.cur !== myIdx) {
-          document.getElementById('rollBtn').disabled = true;
-        }
+  if(db) {
+    // ── Firebase 모드 ──
+    const roomRef = db.ref('rooms/'+code);
+    const handler = roomRef.on('value', snap => {
+      const room = snap.val();
+      if(!room) return;
+      const players = Object.values(room.players || {});
+      if(document.getElementById('waiting').classList.contains('active')) {
+        updateWaitUI(code, players);
       }
+      if(room.started && room.gameData) {
+        if(document.getElementById('game').classList.contains('active')) return;
+        G = JSON.parse(JSON.stringify(room.gameData));
+        fullGameInit();
+      }
+    });
+    _roomListener = () => roomRef.off('value', handler);
+
+  } else {
+    // ── 로컬 모드: BroadcastChannel ──
+    try {
+      const bc = new BroadcastChannel('tjcar_room_'+code);
+      bc.onmessage = (e) => {
+        const msg = e.data;
+        if(!msg) return;
+        if(msg.type==='players' && document.getElementById('waiting').classList.contains('active')) {
+          ROOMS[code] = { players: msg.players };
+          renderWait(msg.players);
+        }
+        if(msg.type==='start') {
+          if(document.getElementById('game').classList.contains('active')) return;
+          G = JSON.parse(JSON.stringify(msg.gameState));
+          fullGameInit();
+        }
+        if(msg.type==='gameState') {
+          if(!document.getElementById('game').classList.contains('active')) return;
+          G = JSON.parse(JSON.stringify(msg.gameState));
+          renderDice(); renderHints(); renderSC(); renderPtabs(); updateHeader(); updateRollBtn();
+        }
+      };
+      window._bc = bc;
+      _roomListener = () => bc.close();
+    } catch(e) {
+      console.warn('BroadcastChannel 미지원:', e.message);
     }
-  });
-  // 리스너 해제 함수 저장
-  _roomListener = () => roomRef.off('value', handler);
+  }
+}
+
+// ── 게임 화면 완전 초기화 (방장 + 참가자 공통) ──
+function fullGameInit() {
+  showScreen('game');
+  document.getElementById('ptabs').style.display = 'flex';
+  document.getElementById('aiLogBox').style.display = 'block';
+
+  const myName = window._myName || AUTH.displayName || AUTH.username;
+  const myIdx  = G.players.findIndex(p => p.name === myName);
+  const isMyTurn = myIdx === -1 || G.cur === myIdx;
+
+  renderDice();
+  renderHints();
+  renderSC();
+  renderPtabs();
+  updateHeader();
+  updateRollBtn();
+
+  if(!isMyTurn) {
+    const btn = document.getElementById('rollBtn');
+    btn.disabled = true;
+    btn.textContent = (G.players[G.cur]?.name || '상대방') + '의 차례';
+  }
+}
+
+// ── 상태 브로드캐스트 (로컬 모드) ──
+function broadcastGameState(type='gameState') {
+  if(window._bc) window._bc.postMessage({ type, gameState: G });
+}
+function broadcastPlayers(players) {
+  if(window._bc) window._bc.postMessage({ type:'players', players });
 }
 
 // ─── 대기실 UI 업데이트 ───
@@ -1835,26 +1878,23 @@ function updateWaitUI(code, players) {
 function addBot(){
   const code = window._RC;
   const db = initFirebase();
-
   const bots = ['봇-알파','봇-베타','봇-감마','봇-델타'];
-
   if(db) {
     db.ref('rooms/'+code+'/players').once('value').then(snap => {
       const players = Object.values(snap.val()||{});
       if(players.length>=6){ toast('최대 6명'); return; }
       const bot = bots[players.length-1]||'AI봇';
       db.ref('rooms/'+code+'/players/'+players.length).set({
-        name:bot, avatar:'', nftAvatar:'', waxAccount:'',
-        nftBonus:0, nftCount:0, isAI:true,
-      }).then(() => toast(bot+' 참가!'));
+        name:bot,avatar:'',nftAvatar:'',waxAccount:'',nftBonus:0,nftCount:0,isAI:true,
+      }).then(()=>toast(bot+' 참가!'));
     });
   } else {
-    const r = ROOMS[code];
-    if(!r) return;
+    const r = ROOMS[code]; if(!r) return;
     if(r.players.length>=6){ toast('최대 6명'); return; }
     const bot = bots[r.players.length-1]||'AI봇';
     r.players.push({name:bot,avatar:'',nftAvatar:'',waxAccount:'',nftBonus:0,nftCount:0,isAI:true});
     renderWait(r.players);
+    broadcastPlayers(r.players);
     toast(bot+' 참가!');
   }
 }
@@ -1881,16 +1921,13 @@ function renderWait(players){
 function startMulti(){
   const code = window._RC;
   const db = initFirebase();
-
   if(db) {
-    // Firebase 모드 — 클라우드에서 최신 플레이어 목록 가져와서 시작
     db.ref('rooms/'+code+'/players').once('value').then(snap => {
       const players = Object.values(snap.val()||{});
       if(players.length < 2){ toast('최소 2명 필요'); return; }
       launchMultiGame(players, code, db);
     });
   } else {
-    // 로컬 fallback
     const r = ROOMS[code];
     if(!r){ toast('방 정보 없음'); return; }
     launchMultiGame(r.players, code, null);
@@ -1903,20 +1940,14 @@ function launchMultiGame(players, code, db) {
     players: players.map(p => mkPlayer(p)),
     cur:0, round:1,
     dice:[0,0,0,0,0], held:[false,false,false,false,false],
-    rolls:2, rolled:false, over:false,
+    rolls:2, rolled:false, over:false, scTab:0,
   };
-  initTurn();
-  document.getElementById('ptabs').style.display='flex';
-  document.getElementById('aiLogBox').style.display='block';
-  showScreen('game');
-  renderSC(); renderPtabs(); updateHeader();
-
-  // Firebase 모드 — 시작 신호 전송 (참가자들이 subscribeRoom으로 감지)
+  fullGameInit();
   if(db) {
-    db.ref('rooms/'+code).update({
-      started: true,
-      gameData: G,
-    }).catch(e => console.warn('게임 시작 신호 실패:', e));
+    db.ref('rooms/'+code).update({ started:true, gameData:G })
+      .catch(e=>console.warn('시작 신호 실패:',e));
+  } else {
+    broadcastGameState('start');
   }
 }
 
