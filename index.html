@@ -6,8 +6,8 @@
 <title>TJCAR야찌 🎲 × Steem × WAX</title>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<!-- WAX Cloud Wallet JS SDK (wax-io/waxjs 정식 패키지) -->
-<script src="https://cdn.jsdelivr.net/npm/@wax-io/waxjs@1.2.2/dist/wax.js"></script>
+<!-- WAX Cloud Wallet JS SDK — 공식 GitHub dist-web 직접 로드 -->
+<script src="https://cdn.jsdelivr.net/gh/worldwide-asset-exchange/waxjs@develop/dist-web/waxjs.js"></script>
 
 <!-- =====================================================
   ★ Google AdSense 삽입 위치 (1) — <head> 자동광고 코드
@@ -916,63 +916,79 @@ let AUTH = {
   get loggedIn() { return !!(this.steemUser || this.waxUser); },
 };
 
-// WAX JS instance (lazy) — mycloudwallet.com 기반
+// WAX JS instance
+// 공식 문서 기준: new waxjs.WaxJS({ rpcEndpoint, tryAutoLogin })
 let _wax = null;
 function getWAX() {
   if(_wax) return _wax;
   try {
-    // wax-io/waxjs v1.2+ 올바른 초기화 방법
-    // mycloudwallet.com = 구 wallet.wax.io 의 새 주소
-    if(typeof WaxJS !== 'undefined') {
-      _wax = new WaxJS({
-        rpcEndpoint: CFG.WAX_RPC,
-        userAccount: undefined,
-        pubKeys: undefined,
-        tryAutoLogin: false,
-      });
-    } else if(typeof waxjs !== 'undefined' && waxjs.WaxJS) {
+    if(typeof waxjs !== 'undefined' && waxjs.WaxJS) {
       _wax = new waxjs.WaxJS({
         rpcEndpoint: CFG.WAX_RPC,
         tryAutoLogin: false,
       });
-    } else {
-      return null;
+      return _wax;
     }
   } catch(e) {
-    console.warn('WAX SDK 초기화 실패:', e.message);
-    _wax = null;
+    console.warn('WAX SDK init error:', e);
   }
-  return _wax;
+  return null;
 }
 
 // ════════════════════════════════════════════════
 // WAX LOGIN
 // ════════════════════════════════════════════════
+
+// 페이지 로드 후 SDK 상태를 탭 UI에 반영
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const wax = getWAX();
+    const btn = document.getElementById('wax-btn');
+    if(!btn) return;
+    if(!wax) {
+      // SDK 로드 실패 → 수동 입력 모드 안내 표시
+      smsg('wax',
+        '⚠️ SDK 자동 로드 실패. 아래 계정명 직접 입력을 이용하세요.',
+        'rgba(255,150,80,0.9)');
+      showWAXManualInput();
+    }
+  }, 1500);
+});
+
 async function loginWAX() {
   const btn = document.getElementById('wax-btn');
   btn.disabled = true;
   prog('wax', 10);
   smsg('wax', 'WAX Cloud Wallet 연결 중...', 'rgba(248,190,100,0.85)');
 
+  // SDK 재확인 (혹시 나중에 로드됐을 수도 있음)
+  _wax = null;
+  const wax = getWAX();
+
+  if(!wax) {
+    progHide('wax');
+    btn.disabled = false;
+    smsg('wax',
+      '⚠️ SDK 로드 실패. 아래 계정명 직접 입력을 이용하세요.',
+      'rgba(255,150,80,0.9)');
+    showWAXManualInput();
+    return;
+  }
+
   try {
-    const wax = getWAX();
-
-    // SDK 로드 확인
-    if(!wax) {
-      // SDK가 없으면 mycloudwallet 직접 팝업으로 대체
-      throw new Error('SDK_MISSING');
-    }
-
     prog('wax', 30);
-    smsg('wax', '지갑 팝업이 열립니다... (팝업 차단 해제 필요)', 'rgba(248,190,100,0.85)');
+    smsg('wax', '팝업이 열립니다... (팝업 차단 해제 필요)', 'rgba(248,190,100,0.85)');
 
     const account = await wax.login();
-
     if(!account) throw new Error('계정 정보를 받지 못했습니다');
+
+    // 로그인 후 아바타 조회 시도
+    let avatar = '';
+    try { avatar = await wax.getAvatar() || ''; } catch(e) {}
 
     prog('wax', 65);
     smsg('wax', 'NFT 불러오는 중...', 'rgba(248,190,100,0.85)');
-    AUTH.waxUser = { account, avatar: '' };
+    AUTH.waxUser = { account, avatar };
     await loadWAXNFTs(account);
     prog('wax', 100);
     setTimeout(() => { progHide('wax'); btn.disabled = false; onLogin(); }, 280);
@@ -981,17 +997,16 @@ async function loginWAX() {
     progHide('wax');
     btn.disabled = false;
 
-    if(e.message === 'SDK_MISSING') {
-      // SDK 미로드 → 수동 계정명 입력 모드로 전환
-      showWAXManualInput();
-    } else if(e.message.includes('closed') || e.message.includes('cancel') ||
-              e.message.includes('User closed') || e.message.includes('Modal closed')) {
+    const msg = e.message || '';
+    if(msg.includes('closed') || msg.includes('cancel') ||
+       msg.includes('User closed') || msg.includes('Modal closed')) {
       smsg('wax', '로그인이 취소되었습니다.', 'rgba(255,150,80,0.9)');
-    } else if(e.message.includes('popup') || e.message.includes('Popup')) {
-      smsg('wax', '⚠️ 팝업이 차단되었습니다. 브라우저 주소창 오른쪽의 팝업 차단 아이콘을 클릭해 허용해 주세요.',
+    } else if(msg.includes('popup') || msg.includes('Popup') || msg.includes('blocked')) {
+      smsg('wax',
+        '⚠️ 팝업이 차단됐습니다. 주소창 오른쪽 팝업 아이콘을 클릭해 허용 후 다시 시도하세요.',
         'rgba(255,150,80,0.9)');
     } else {
-      smsg('wax', `WAX 오류: ${e.message}`, 'rgba(255,110,110,0.9)');
+      smsg('wax', `WAX 오류: ${msg}`, 'rgba(255,110,110,0.9)');
     }
   }
 }
