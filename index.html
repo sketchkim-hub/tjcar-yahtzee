@@ -8,6 +8,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- WAX Cloud Wallet JS SDK — 공식 GitHub dist-web 직접 로드 -->
 <script src="https://cdn.jsdelivr.net/gh/worldwide-asset-exchange/waxjs@develop/dist-web/waxjs.js"></script>
+<!-- Firebase Realtime Database (실시간 멀티플레이용) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
 <!-- =====================================================
   ★ Google AdSense 삽입 위치 (1) — <head> 자동광고 코드
@@ -983,6 +986,59 @@ input[type=password]:focus{border-color:var(--steem);}
 //                                                    ↑ 이 부분
 // ───────────────────────────────────────────────────────────────────
 
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  🔥 Firebase 실시간 멀티플레이 설정                               ║
+// ║                                                                  ║
+// ║  STEP 0 — Firebase 프로젝트 생성 (무료)                          ║
+// ║  1. https://console.firebase.google.com 접속                    ║
+// ║  2. [프로젝트 추가] → 프로젝트 이름 입력 (예: tjcar-yahtzee)      ║
+// ║  3. Google Analytics: 사용 안함 선택 → [프로젝트 만들기]          ║
+// ║  4. 왼쪽 메뉴 [빌드] → [Realtime Database] → [데이터베이스 만들기]║
+// ║     → 위치: 미국(us-central1) → [테스트 모드로 시작] → [사용 설정]║
+// ║  5. 왼쪽 메뉴 [프로젝트 설정] → [내 앱] →                        ║
+// ║     웹 아이콘(</>)  클릭 → 앱 닉네임 입력 → [앱 등록]             ║
+// ║  6. firebaseConfig 코드 복사 → 아래 FIREBASE_CFG 에 붙여넣기     ║
+// ║  7. Realtime Database → 규칙 탭 → 아래 규칙으로 교체 후 게시:    ║
+// ║     { "rules": { ".read": true, ".write": true } }               ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+const FIREBASE_CFG = {
+  // ★ Firebase 콘솔에서 복사한 설정값으로 교체하세요
+  apiKey:            "여기에_apiKey",
+  authDomain:        "여기에_authDomain",
+  databaseURL:       "여기에_databaseURL",   // 반드시 입력! (Realtime DB URL)
+  projectId:         "여기에_projectId",
+  storageBucket:     "여기에_storageBucket",
+  messagingSenderId: "여기에_messagingSenderId",
+  appId:             "여기에_appId",
+};
+
+// Firebase 초기화 (databaseURL 없으면 로컬 모드로 fallback)
+let _db = null;
+function initFirebase() {
+  if(_db) return _db;
+  try {
+    if(!FIREBASE_CFG.databaseURL || FIREBASE_CFG.databaseURL.includes('여기에')) {
+      console.warn('Firebase 미설정 → 로컬 모드(단일 기기 테스트만 가능)');
+      return null;
+    }
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CFG);
+    _db = firebase.database();
+    return _db;
+  } catch(e) {
+    console.warn('Firebase 초기화 실패:', e.message);
+    return null;
+  }
+}
+
+// ─── DB 헬퍼 ───
+function dbRef(path)  { const db = initFirebase(); return db ? db.ref(path) : null; }
+
+// ════════════════════════════════════════════════════════════════
+// Firebase 미설정 시 → 로컬 ROOMS 객체로 fallback (기존 동작 유지)
+// Firebase 설정 시  → 실시간 동기화 (여러 기기에서 같은 방 공유)
+// ════════════════════════════════════════════════════════════════
+
 const CFG = {
   // ★ 실제 AtomicHub 컬렉션명으로 변경하세요
   WAX_COLLECTION: 'tjcaryahtzee',
@@ -1513,12 +1569,32 @@ function showNFTModal() {
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
-// Auto-fill
+function copyInvite(){
+  const l=document.getElementById('inviteLinkDisp').textContent;
+  navigator.clipboard.writeText(l)
+    .then(()=>toast('초대 링크 복사됨!'))
+    .catch(()=>{const t=document.createElement('textarea');t.value=l;
+      document.body.appendChild(t);t.select();document.execCommand('copy');
+      document.body.removeChild(t);toast('복사됨!');});
+}
+
+// Auto-fill & URL 자동 참가
 (function(){
   const last=localStorage.getItem('tjcar_lastUser');
-  if(last){document.getElementById('kc-user').value=last;document.getElementById('pk-user').value=last;}
+  if(last){
+    document.getElementById('kc-user').value=last;
+    document.getElementById('pk-user').value=last;
+  }
   const join=new URLSearchParams(location.search).get('join');
-  if(join) setTimeout(()=>{document.getElementById('roomCodeInput').value=join.toUpperCase();toast('방 코드: '+join);},500);
+  if(join){
+    // 초대 링크로 접속한 경우 → 로그인 화면에 코드 표시
+    setTimeout(()=>{
+      const inp = document.getElementById('roomCodeInput');
+      if(inp) inp.value = join.toUpperCase();
+      // 로비 화면에도 안내 표시
+      toast('🎮 초대 코드: '+join+' — 로그인 후 [방 참가하기]를 눌러주세요');
+    }, 600);
+  }
 })();
 
 // ═══════════════════════════════════════════════
@@ -1592,64 +1668,255 @@ function startSolo(){
   showScreen('game'); renderSC(); updateHeader();
 }
 
-// ─── Multi ───
+// ─── 방 만들기 ───
 function createRoom(){
-  const n=AUTH.displayName||AUTH.username||'호스트';
-  const code=Math.random().toString(36).substring(2,8).toUpperCase();
-  ROOMS[code]={players:[{name:n,avatar:AUTH.avatar,nftAvatar:AUTH.nftAvatar,
-    waxAccount:AUTH.waxUser?.account||'',nftBonus:AUTH.waxNFTBonus,nftCount:AUTH.waxNFTs.length,isAI:false}]};
-  document.getElementById('roomCodeDisp').textContent=code;
-  document.getElementById('inviteLinkDisp').textContent=location.href.split('?')[0]+'?join='+code;
-  renderWait(ROOMS[code].players); showScreen('waiting'); window._RC=code;
-}
-function joinRoom(){
-  const code=document.getElementById('roomCodeInput').value.trim().toUpperCase();
-  if(!code){toast('코드를 입력하세요');return;}
-  const n=AUTH.displayName||AUTH.username||'게스트';
-  if(!ROOMS[code]){ROOMS[code]={players:[{name:n,avatar:AUTH.avatar,nftAvatar:AUTH.nftAvatar,
-    waxAccount:AUTH.waxUser?.account||'',nftBonus:AUTH.waxNFTBonus,nftCount:AUTH.waxNFTs.length,isAI:false}]};toast('새 방 생성');}
-  else{
-    if(ROOMS[code].players.length>=6){toast('방이 꽉 찼습니다!');return;}
-    if(!ROOMS[code].players.find(p=>p.name===n))
-      ROOMS[code].players.push({name:n,avatar:AUTH.avatar,nftAvatar:AUTH.nftAvatar,
-        waxAccount:AUTH.waxUser?.account||'',nftBonus:AUTH.waxNFTBonus,nftCount:AUTH.waxNFTs.length,isAI:false});
+  const n = AUTH.displayName||AUTH.username||'호스트';
+  const code = Math.random().toString(36).substring(2,8).toUpperCase();
+  const mePlayer = {
+    name:n, avatar:AUTH.avatar||'', nftAvatar:AUTH.nftAvatar||'',
+    waxAccount:AUTH.waxUser?.account||'',
+    nftBonus:AUTH.waxNFTBonus||0, nftCount:AUTH.waxNFTs.length||0, isAI:false,
+  };
+
+  const db = initFirebase();
+  if(db) {
+    // Firebase 모드 — 클라우드에 방 생성
+    db.ref('rooms/'+code).set({
+      host: n,
+      created: Date.now(),
+      started: false,
+      players: { 0: mePlayer },
+    }).then(() => {
+      window._RC = code;
+      window._myName = n;
+      subscribeRoom(code);
+      updateWaitUI(code, [mePlayer]);
+      showScreen('waiting');
+    }).catch(e => toast('방 생성 실패: '+e.message));
+  } else {
+    // 로컬 fallback
+    ROOMS[code] = { players:[mePlayer] };
+    window._RC = code;
+    renderWait(ROOMS[code].players);
+    showScreen('waiting');
   }
-  document.getElementById('roomCodeDisp').textContent=code;
-  document.getElementById('inviteLinkDisp').textContent=location.href.split('?')[0]+'?join='+code;
-  renderWait(ROOMS[code].players); showScreen('waiting'); window._RC=code;
+
+  document.getElementById('roomCodeDisp').textContent = code;
+  document.getElementById('inviteLinkDisp').textContent =
+    location.href.split('?')[0]+'?join='+code;
 }
+
+// ─── 방 참가하기 ───
+function joinRoom(){
+  const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+  if(!code){ toast('코드를 입력하세요'); return; }
+  const n = AUTH.displayName||AUTH.username||'게스트';
+  const mePlayer = {
+    name:n, avatar:AUTH.avatar||'', nftAvatar:AUTH.nftAvatar||'',
+    waxAccount:AUTH.waxUser?.account||'',
+    nftBonus:AUTH.waxNFTBonus||0, nftCount:AUTH.waxNFTs.length||0, isAI:false,
+  };
+
+  const db = initFirebase();
+  if(db) {
+    // Firebase 모드 — 클라우드 방에 참가
+    const roomRef = db.ref('rooms/'+code);
+    roomRef.once('value').then(snap => {
+      const room = snap.val();
+      if(!room) {
+        // 방 없으면 새로 생성 (직접 코드 입력한 경우)
+        db.ref('rooms/'+code).set({
+          host: n, created: Date.now(), started: false,
+          players: { 0: mePlayer },
+        }).then(() => {
+          window._RC = code; window._myName = n;
+          subscribeRoom(code);
+          updateWaitUI(code, [mePlayer]);
+          showScreen('waiting');
+          document.getElementById('roomCodeDisp').textContent = code;
+          document.getElementById('inviteLinkDisp').textContent =
+            location.href.split('?')[0]+'?join='+code;
+        });
+        return;
+      }
+      // 방 있으면 참가
+      const players = Object.values(room.players || {});
+      if(players.length >= 6){ toast('방이 꽉 찼습니다!'); return; }
+      if(room.started){ toast('이미 시작된 게임입니다'); return; }
+      if(players.find(p=>p.name===n)){ toast('이미 참가한 닉네임입니다'); return; }
+
+      // 새 플레이어 추가
+      const newIdx = players.length;
+      db.ref('rooms/'+code+'/players/'+newIdx).set(mePlayer).then(() => {
+        window._RC = code; window._myName = n;
+        subscribeRoom(code);
+        showScreen('waiting');
+        document.getElementById('roomCodeDisp').textContent = code;
+        document.getElementById('inviteLinkDisp').textContent =
+          location.href.split('?')[0]+'?join='+code;
+      });
+    }).catch(e => toast('참가 실패: '+e.message));
+  } else {
+    // 로컬 fallback
+    if(!ROOMS[code]){
+      ROOMS[code]={ players:[mePlayer] }; toast('새 방 생성(로컬)');
+    } else {
+      if(ROOMS[code].players.length>=6){ toast('방이 꽉 찼습니다!'); return; }
+      if(!ROOMS[code].players.find(p=>p.name===n))
+        ROOMS[code].players.push(mePlayer);
+    }
+    window._RC = code;
+    document.getElementById('roomCodeDisp').textContent = code;
+    document.getElementById('inviteLinkDisp').textContent =
+      location.href.split('?')[0]+'?join='+code;
+    renderWait(ROOMS[code].players);
+    showScreen('waiting');
+  }
+}
+
+// ─── Firebase 방 실시간 구독 ───
+let _roomListener = null;
+function subscribeRoom(code) {
+  // 이전 리스너 해제
+  if(_roomListener) { _roomListener(); _roomListener = null; }
+
+  const db = initFirebase();
+  if(!db) return;
+
+  const roomRef = db.ref('rooms/'+code);
+  const handler = roomRef.on('value', snap => {
+    const room = snap.val();
+    if(!room) return;
+    const players = Object.values(room.players || {});
+
+    // 대기실 UI 업데이트
+    if(document.getElementById('waiting').classList.contains('active')) {
+      updateWaitUI(code, players);
+    }
+
+    // 방장이 게임 시작 신호를 보냈을 때 → 참가자도 게임 시작
+    if(room.started && room.gameData) {
+      const myName = window._myName;
+      const myIdx  = players.findIndex(p => p.name === myName);
+      if(myIdx === -1) return; // 내가 없으면 무시
+
+      // 이미 게임 화면이면 중복 시작 방지
+      if(document.getElementById('game').classList.contains('active')) return;
+
+      // 게임 상태 복원 후 화면 전환
+      G = room.gameData;
+      // 방장이 아닌 참가자 — 게임 화면으로 이동
+      if(players[0].name !== myName) {
+        showScreen('game');
+        renderSC(); renderPtabs(); updateHeader();
+        document.getElementById('ptabs').style.display='flex';
+        document.getElementById('aiLogBox').style.display='block';
+        // 내 차례가 아닌 경우 주사위 비활성화
+        if(G.cur !== myIdx) {
+          document.getElementById('rollBtn').disabled = true;
+        }
+      }
+    }
+  });
+  // 리스너 해제 함수 저장
+  _roomListener = () => roomRef.off('value', handler);
+}
+
+// ─── 대기실 UI 업데이트 ───
+function updateWaitUI(code, players) {
+  document.getElementById('roomCodeDisp').textContent = code;
+  document.getElementById('inviteLinkDisp').textContent =
+    location.href.split('?')[0]+'?join='+code;
+  renderWait(players);
+}
+
+// ─── 봇 추가 ───
 function addBot(){
-  const r=ROOMS[window._RC];if(!r)return;if(r.players.length>=6){toast('최대 6명');return;}
-  const bot=['봇-알파','봇-베타','봇-감마','봇-델타'][r.players.length-1]||'AI봇';
-  r.players.push({name:bot,avatar:'',nftAvatar:'',waxAccount:'',nftBonus:0,nftCount:0,isAI:true});
-  renderWait(r.players);toast(bot+' 참가!');
+  const code = window._RC;
+  const db = initFirebase();
+
+  const bots = ['봇-알파','봇-베타','봇-감마','봇-델타'];
+
+  if(db) {
+    db.ref('rooms/'+code+'/players').once('value').then(snap => {
+      const players = Object.values(snap.val()||{});
+      if(players.length>=6){ toast('최대 6명'); return; }
+      const bot = bots[players.length-1]||'AI봇';
+      db.ref('rooms/'+code+'/players/'+players.length).set({
+        name:bot, avatar:'', nftAvatar:'', waxAccount:'',
+        nftBonus:0, nftCount:0, isAI:true,
+      }).then(() => toast(bot+' 참가!'));
+    });
+  } else {
+    const r = ROOMS[code];
+    if(!r) return;
+    if(r.players.length>=6){ toast('최대 6명'); return; }
+    const bot = bots[r.players.length-1]||'AI봇';
+    r.players.push({name:bot,avatar:'',nftAvatar:'',waxAccount:'',nftBonus:0,nftCount:0,isAI:true});
+    renderWait(r.players);
+    toast(bot+' 참가!');
+  }
 }
+
+// ─── 대기실 렌더 ───
 function renderWait(players){
-  document.getElementById('waitPlayerList').innerHTML=players.map((p,i)=>`
+  document.getElementById('waitPlayerList').innerHTML = players.map((p,i)=>`
     <div class="w-pitem">
-      ${p.avatar?`<img class="w-pav ${p.waxAccount?'w-pav-wax':'w-pav-steem'}" src="${p.avatar}" alt="" onerror="this.style.display='none'">`:
-        `<div class="w-pph">${i===0?'👑':p.isAI?'🤖':'👤'}</div>`}
+      ${p.avatar
+        ? `<img class="w-pav ${p.waxAccount?'w-pav-wax':'w-pav-steem'}"
+               src="${p.avatar}" alt="" onerror="this.style.display='none'">`
+        : `<div class="w-pph">${i===0?'👑':p.isAI?'🤖':'👤'}</div>`}
       <span style="flex:1;font-size:0.8rem;">${p.name}</span>
       ${p.waxAccount?`<span style="font-size:0.62rem;color:var(--wax);">🟠 ${p.waxAccount}</span>`:''}
       ${p.nftCount>0?`<span class="w-nft-badge">NFT×${p.nftCount}</span>`:''}
       ${i===0?'<span style="font-size:0.62rem;color:var(--text-dim);">방장</span>':''}
     </div>`).join('');
-  document.getElementById('startBtn').disabled=players.length<2;
-  document.getElementById('waitStatus').textContent=
-    players.length<2?'최소 2명 필요':players.length+'명 준비 완료 ✓';
+  document.getElementById('startBtn').disabled = players.length < 2;
+  document.getElementById('waitStatus').textContent =
+    players.length < 2 ? '최소 2명 필요' : players.length+'명 준비 완료 ✓';
 }
-function copyInvite(){
-  const l=document.getElementById('inviteLinkDisp').textContent;
-  navigator.clipboard.writeText(l).then(()=>toast('복사됨!')).catch(()=>{const t=document.createElement('textarea');t.value=l;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);toast('복사됨!');});
-}
+
+// ─── 멀티 게임 시작 ───
 function startMulti(){
-  const r=ROOMS[window._RC];if(!r)return;
-  G={mode:'multi',players:r.players.map(p=>mkPlayer(p)),cur:0,round:1,
-    dice:[0,0,0,0,0],held:[false,false,false,false,false],rolls:2,rolled:false,over:false};
+  const code = window._RC;
+  const db = initFirebase();
+
+  if(db) {
+    // Firebase 모드 — 클라우드에서 최신 플레이어 목록 가져와서 시작
+    db.ref('rooms/'+code+'/players').once('value').then(snap => {
+      const players = Object.values(snap.val()||{});
+      if(players.length < 2){ toast('최소 2명 필요'); return; }
+      launchMultiGame(players, code, db);
+    });
+  } else {
+    // 로컬 fallback
+    const r = ROOMS[code];
+    if(!r){ toast('방 정보 없음'); return; }
+    launchMultiGame(r.players, code, null);
+  }
+}
+
+function launchMultiGame(players, code, db) {
+  G = {
+    mode:'multi',
+    players: players.map(p => mkPlayer(p)),
+    cur:0, round:1,
+    dice:[0,0,0,0,0], held:[false,false,false,false,false],
+    rolls:2, rolled:false, over:false,
+  };
   initTurn();
   document.getElementById('ptabs').style.display='flex';
   document.getElementById('aiLogBox').style.display='block';
-  showScreen('game'); renderSC(); renderPtabs(); updateHeader();
+  showScreen('game');
+  renderSC(); renderPtabs(); updateHeader();
+
+  // Firebase 모드 — 시작 신호 전송 (참가자들이 subscribeRoom으로 감지)
+  if(db) {
+    db.ref('rooms/'+code).update({
+      started: true,
+      gameData: G,
+    }).catch(e => console.warn('게임 시작 신호 실패:', e));
+  }
 }
 
 // ─── Dice ───
