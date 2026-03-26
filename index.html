@@ -12,10 +12,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
-
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5486420039490477"
-     crossorigin="anonymous"></script>
-
+<!-- =====================================================
+  ★ Google AdSense 삽입 위치 (1) — <head> 자동광고 코드
+  아래 두 줄을 본인 AdSense 코드로 교체하세요.
+  자동 광고를 사용하면 구글이 최적 위치에 자동 배치합니다.
+  ======================================================
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js
+    ?client=ca-pub-여기에본인ID" crossorigin="anonymous"></script>
+  ===================================================== -->
 <style>
 :root{
   --bg:#080810;--panel:#10101c;--card:#181828;--border:#252540;
@@ -687,7 +691,7 @@ input[type=password]:focus{border-color:var(--steem);}
       <div style="color:var(--text-dim);font-size:0.7rem;margin:4px 0;" id="waitStatus">최소 2명 필요</div>
       <div class="w-btns">
         <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="addBot()">🤖 봇 추가</button>
-        <button class="btn btn-primary" id="startBtn" style="flex:2;" onclick="startMulti()" disabled style="display:none;">🎲 시작!</button>
+        <button class="btn btn-primary" id="startBtn" style="flex:2;" onclick="startMulti()" disabled>🎲 시작!</button>
       </div>
       <button class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="showScreen('lobby')">← 뒤로</button>
     </div>
@@ -772,7 +776,7 @@ input[type=password]:focus{border-color:var(--steem);}
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div class="ig">
             <label>태그 (쉼표 구분, 최대 5개)</label>
-            <input type="text" id="postTags" value="tjcar,kr,boardgame,yahtzee,gaming"
+            <input type="text" id="postTags" value="tjcar야찌,스팀,boardgame,yahtzee,gaming"
               style="font-size:0.8rem;padding:8px 12px;">
           </div>
           <div style="display:flex;gap:6px;">
@@ -1000,13 +1004,13 @@ input[type=password]:focus{border-color:var(--steem);}
 
 const FIREBASE_CFG = {
   // ★ Firebase 콘솔에서 복사한 설정값으로 교체하세요
-  apiKey:            "AIzaSyAroo_XGF1vH3pCo_eBWE3ig4xeLddn3fM",
-  authDomain:        "tjcar-yahtzee-ecb17.firebaseapp.com",
-  databaseURL:       "https://tjcar-yahtzee-ecb17-default-rtdb.firebaseio.com",   // 반드시 입력! (Realtime DB URL)
-  projectId:         "tjcar-yahtzee-ecb17",
-  storageBucket:     "tjcar-yahtzee-ecb17.firebasestorage.app",
-  messagingSenderId: "584429405950",
-  appId:             "1:584429405950:web:76872e7822bf3d8b12c7af",
+  apiKey:            "여기에_apiKey",
+  authDomain:        "여기에_authDomain",
+  databaseURL:       "여기에_databaseURL",   // 반드시 입력! (Realtime DB URL)
+  projectId:         "여기에_projectId",
+  storageBucket:     "여기에_storageBucket",
+  messagingSenderId: "여기에_messagingSenderId",
+  appId:             "여기에_appId",
 };
 
 // Firebase 초기화 (databaseURL 없으면 로컬 모드로 fallback)
@@ -1040,12 +1044,12 @@ const CFG = {
   WAX_COLLECTION: 'tjcaryahtzee',
 
   // ★ NFT 1개 보유 시 추가되는 보너스 점수 (원하는 숫자로 변경)
-  NFT_BONUS_PER: 1,
+  NFT_BONUS_PER: 5,
 
   // ══════════════════════════════════════════════
   // ★ 참가권 NFT 설정
   // ══════════════════════════════════════════════
-  TICKET_RECEIVER: '4z3hc.wam',   // ★ 변경 필요
+  TICKET_RECEIVER: 'tjcaradmin.wam',   // ★ 변경 필요
   TICKET_SCHEMA: '',
   TICKET_TEMPLATE_ID: 0,
   TICKET_MODE: false,
@@ -1057,7 +1061,7 @@ const CFG = {
 
   // 수상 NFT를 보유한 운영자 WAX 계정
   // 이 계정으로 WAX 로그인해야 지급 버튼이 활성화됩니다
-  AWARD_OPERATOR: '4z3hc.wam',    // ★ 운영자 WAX 계정명으로 변경
+  AWARD_OPERATOR: 'tjcaradmin.wam',    // ★ 운영자 WAX 계정명으로 변경
 
   // 🏆 단체전 우승 NFT 템플릿 ID
   // AtomicHub → 내 컬렉션 → Templates 탭에서 확인
@@ -1789,13 +1793,30 @@ function subscribeRoom(code) {
       const room = snap.val();
       if(!room) return;
       const players = Object.values(room.players || {});
+
+      // 대기실 업데이트
       if(document.getElementById('waiting').classList.contains('active')) {
         updateWaitUI(code, players);
       }
+
+      // 게임 시작 신호 → 참가자 화면 전환
       if(room.started && room.gameData) {
-        if(document.getElementById('game').classList.contains('active')) return;
-        G = JSON.parse(JSON.stringify(room.gameData));
-        fullGameInit();
+        if(!document.getElementById('game').classList.contains('active')) {
+          G = JSON.parse(JSON.stringify(room.gameData));
+          fullGameInit();
+          return;
+        }
+        // 이미 게임 중 → 상태 동기화 (다른 플레이어가 점수 배치했을 때)
+        const incoming = room.gameData;
+        // 내가 방금 배치한 경우(cur가 나)는 무시 — 내 화면은 이미 업데이트됨
+        const myName = window._myName||AUTH.displayName||AUTH.username;
+        const myIdx  = incoming.players ? incoming.players.findIndex(p=>p.name===myName) : -1;
+        // 현재 차례가 나이면 무시 (내가 직접 처리)
+        if(myIdx !== -1 && incoming.cur === myIdx) return;
+        // 상대방 차례 → 상태 업데이트 후 UI 갱신
+        G = JSON.parse(JSON.stringify(incoming));
+        renderDice(); renderHints(); renderSC(); renderPtabs(); updateHeader();
+        updateMyTurnUI();
       }
     });
     _roomListener = () => roomRef.off('value', handler);
@@ -1819,7 +1840,8 @@ function subscribeRoom(code) {
         if(msg.type==='gameState') {
           if(!document.getElementById('game').classList.contains('active')) return;
           G = JSON.parse(JSON.stringify(msg.gameState));
-          renderDice(); renderHints(); renderSC(); renderPtabs(); updateHeader(); updateRollBtn();
+          renderDice(); renderHints(); renderSC(); renderPtabs(); updateHeader();
+          updateMyTurnUI();
         }
       };
       window._bc = bc;
@@ -1836,17 +1858,17 @@ function fullGameInit() {
   document.getElementById('ptabs').style.display = 'flex';
   document.getElementById('aiLogBox').style.display = 'block';
 
-  // 직렬화 후 scores 등 필수 필드 복구
+  // ── 직렬화/역직렬화 후 scores 등 필수 필드 복구 ──
   if(G.players) {
     G.players = G.players.map(p => ({
       ...p,
-      scores:     (p.scores && typeof p.scores === 'object') ? p.scores : {},
-      _yb:        p._yb        || 0,
-      nftBonus:   p.nftBonus   || 0,
-      nftCount:   p.nftCount   || 0,
-      nftAvatar:  p.nftAvatar  || '',
-      avatar:     p.avatar     || '',
-      waxAccount: p.waxAccount || '',
+      scores:      (p.scores && typeof p.scores === 'object') ? p.scores : {},
+      _yb:         p._yb         || 0,
+      nftBonus:    p.nftBonus    || 0,
+      nftCount:    p.nftCount    || 0,
+      nftAvatar:   p.nftAvatar   || '',
+      avatar:      p.avatar      || '',
+      waxAccount:  p.waxAccount  || '',
     }));
   }
   if(G.scTab === undefined) G.scTab = G.cur || 0;
@@ -1855,8 +1877,9 @@ function fullGameInit() {
   if(G.rolls  === undefined) G.rolls  = 2;
   if(G.rolled === undefined) G.rolled = false;
 
-    const myName  = window._myName || AUTH.displayName || AUTH.username;
+  const myName  = window._myName || AUTH.displayName || AUTH.username;
   const myIdx   = G.players ? G.players.findIndex(p => p.name === myName) : -1;
+  const isMyTurn = myIdx === -1 || G.cur === myIdx;
 
   renderDice();
   renderHints();
@@ -1865,19 +1888,10 @@ function fullGameInit() {
   updateHeader();
   updateRollBtn();
 
-  // myIdx 를 못 찾으면 (게스트 등) 방장이 아닌 경우 첫 차례 아님으로만 처리
-  // 이후 차례는 nextTurn() 이 관리하므로 여기서는 초기 상태만 설정
-  const isMyTurn = myIdx === -1 || G.cur === myIdx;
   if(!isMyTurn) {
     const btn = document.getElementById('rollBtn');
     btn.disabled = true;
-    btn.textContent = (G.players[G.cur]?.name || '상대방') + '의 차례 기다리는 중...';
-  } else {
-    const btn = document.getElementById('rollBtn');
-    btn.disabled = G.rolls <= 0;
-    btn.textContent = G.rolls > 0
-      ? `🎲 굴리기 (${G.rolls}번 남음)`
-      : '📋 배치하세요!';
+    btn.textContent = (G.players[G.cur]?.name || '상대방') + '의 차례';
   }
 }
 
@@ -1935,10 +1949,11 @@ function renderWait(players){
       ${p.nftCount>0?`<span class="w-nft-badge">NFT×${p.nftCount}</span>`:''}
       ${i===0?'<span style="font-size:0.62rem;color:var(--text-dim);">방장</span>':''}
     </div>`).join('');
+
+  // 방장만 시작 버튼 표시
   const myName = window._myName || AUTH.displayName || AUTH.username;
   const isHost = players.length > 0 && players[0].name === myName;
   const btn = document.getElementById('startBtn');
-
   btn.style.display = isHost ? 'block' : 'none';
   btn.disabled = players.length < 2;
 
@@ -1947,7 +1962,7 @@ function renderWait(players){
       ? '최소 2명 필요'
       : isHost
         ? players.length + '명 준비 완료 ✓ — 시작 버튼을 눌러주세요!'
-        : players.length + '명 참가 완료 — 방장이 시작할 때까지 기다려주세요 ⏳';
+        : players.length + '명 참가 완료 — 방장이 게임을 시작할 때까지 기다려주세요 ⏳';
 }
 
 // ─── 멀티 게임 시작 ───
@@ -1975,7 +1990,9 @@ function launchMultiGame(players, code, db) {
     dice:[0,0,0,0,0], held:[false,false,false,false,false],
     rolls:2, rolled:false, over:false, scTab:0,
   };
+  // 주사위 및 UI 초기화 후 게임 화면 전환
   fullGameInit();
+
   if(db) {
     db.ref('rooms/'+code).update({ started:true, gameData:G })
       .catch(e=>console.warn('시작 신호 실패:',e));
@@ -1985,19 +2002,72 @@ function launchMultiGame(players, code, db) {
 }
 
 // ─── Dice ───
-function initTurn(){G.dice=[0,0,0,0,0];G.held=[false,false,false,false,false];G.rolls=2;G.rolled=false;renderDice();renderHints();updateRollBtn();}
-function rollDice(){if(G.rolls<=0)return;G.rolls--;G.rolled=true;G.dice=G.dice.map((v,i)=>G.held[i]?v:Math.ceil(Math.random()*6));
-  document.querySelectorAll('#diceRow .die').forEach((d,i)=>{if(!G.held[i]){d.classList.add('rolling');setTimeout(()=>d.classList.remove('rolling'),400);}});
-  setTimeout(()=>{renderDice();renderHints();updateRollBtn();},50);}
+function initTurn(){
+  G.dice=[0,0,0,0,0]; G.held=[false,false,false,false,false];
+  G.rolls=2; G.rolled=false;
+  renderDice(); renderHints(); updateRollBtn();
+  // 멀티플레이: 내 차례 여부로 버튼 상태 즉시 반영
+  if(G.mode==='multi') updateMyTurnUI();
+}
+
+function rollDice(){
+  if(G.rolls<=0) return;
+  // 멀티플레이: 내 차례가 아니면 굴리기 차단
+  if(G.mode==='multi'){
+    const myName = window._myName||AUTH.displayName||AUTH.username;
+    const myIdx  = G.players.findIndex(p=>p.name===myName);
+    if(myIdx !== -1 && G.cur !== myIdx){ toast('내 차례가 아닙니다'); return; }
+  }
+  G.rolls--; G.rolled=true;
+  G.dice=G.dice.map((v,i)=>G.held[i]?v:Math.ceil(Math.random()*6));
+  document.querySelectorAll('#diceRow .die').forEach((d,i)=>{
+    if(!G.held[i]){d.classList.add('rolling');setTimeout(()=>d.classList.remove('rolling'),400);}
+  });
+  setTimeout(()=>{renderDice();renderHints();updateRollBtn();},50);
+}
 function toggleHold(i){if(!G.rolled)return;G.held[i]=!G.held[i];renderDice();}
 function clearHolds(){G.held=[false,false,false,false,false];renderDice();}
-function renderDice(){const row=document.getElementById('diceRow'),off=!G.rolled||G.rolls<=0;row.innerHTML='';G.dice.forEach((v,i)=>row.appendChild(makeDie(v,G.held[i],i,off)));}
-function updateRollBtn(){const b=document.getElementById('rollBtn');document.getElementById('rollsLeft').textContent=G.rolls;b.disabled=G.rolls<=0;b.textContent=G.rolls>0?`🎲 굴리기 (${G.rolls}번 남음)`:'📋 배치하세요!';}
+function renderDice(){
+  const row=document.getElementById('diceRow'),off=!G.rolled||G.rolls<=0;
+  row.innerHTML='';G.dice.forEach((v,i)=>row.appendChild(makeDie(v,G.held[i],i,off)));
+}
+function updateRollBtn(){
+  const b=document.getElementById('rollBtn');
+  document.getElementById('rollsLeft').textContent=G.rolls;
+  b.disabled=G.rolls<=0;
+  b.textContent=G.rolls>0?`🎲 굴리기 (${G.rolls}번 남음)`:'📋 배치하세요!';
+}
+
+// ─── 멀티플레이: 내 차례 UI 업데이트 ───
+function updateMyTurnUI(){
+  const myName  = window._myName||AUTH.displayName||AUTH.username;
+  const myIdx   = G.players ? G.players.findIndex(p=>p.name===myName) : -1;
+  const isMyTurn = myIdx===-1 || G.cur===myIdx;
+  const btn = document.getElementById('rollBtn');
+  if(isMyTurn){
+    btn.disabled = G.rolls<=0;
+    btn.textContent = G.rolls>0 ? `🎲 굴리기 (${G.rolls}번 남음)` : '📋 배치하세요!';
+  } else {
+    btn.disabled = true;
+    btn.textContent = (G.players[G.cur]?.name||'상대방')+'의 차례 ⏳';
+  }
+}
 
 // ─── Hints ───
 function renderHints(){
   const p=G.players[G.cur],list=document.getElementById('hintList');
+  if(!p||!p.scores){list.innerHTML='';return;}
   if(!G.rolled){list.innerHTML='<div style="color:var(--text-dim);font-size:0.72rem;">주사위를 굴려주세요</div>';return;}
+  // 멀티플레이: 내 차례가 아니면 힌트 숨김
+  if(G.mode==='multi'){
+    const myName=window._myName||AUTH.displayName||AUTH.username;
+    const myIdx=G.players.findIndex(p=>p.name===myName);
+    if(myIdx!==-1 && G.cur!==myIdx){
+      list.innerHTML='<div style="color:var(--text-dim);font-size:0.72rem;">'+
+        (G.players[G.cur]?.name||'상대방')+'의 차례입니다</div>';
+      return;
+    }
+  }
   const avail=CATS.filter(c=>p.scores[c.id]===undefined);
   const scored=avail.map(c=>({...c,val:sc(c.id,G.dice)}));
   const best=scored.length?scored.reduce((a,b)=>b.val>a.val?b:a):null;
@@ -2010,45 +2080,48 @@ function renderHints(){
 }
 
 // ─── Place score ───
-function placeScore(catId, idx=null){
-  const i=idx??G.cur,p=G.players[i];
-  if(p.scores[catId]!==undefined||!G.rolled)return;
+function placeScore(catId,idx=null){
+  const i=idx??G.cur, p=G.players[i];
+  if(!p||p.scores[catId]!==undefined||!G.rolled)return;
+  // 멀티플레이: 내 차례가 아니면 차단
+  if(G.mode==='multi'){
+    const myName=window._myName||AUTH.displayName||AUTH.username;
+    const myIdx=G.players.findIndex(q=>q.name===myName);
+    if(myIdx!==-1 && G.cur!==myIdx){ toast('내 차례가 아닙니다'); return; }
+  }
   if(catId==='yahtzee'&&p.scores.yahtzee===50&&sc('yahtzee',G.dice)===50)p._yb=(p._yb||0)+100;
   p.scores[catId]=sc(catId,G.dice);
-  renderSC();nextTurn();
+  renderSC(); nextTurn();
 
-  // Firebase에 게임 상태 동기화 (다른 기기에 전달)
-  const db = initFirebase();
-  if(db && window._RC) {
+  // Firebase / BroadcastChannel 으로 상태 동기화
+  syncGameState();
+}
+
+// ─── 게임 상태 동기화 (Firebase 또는 BroadcastChannel) ───
+function syncGameState(){
+  if(G.mode!=='multi') return;
+  const db=initFirebase();
+  if(db && window._RC){
     db.ref('rooms/'+window._RC+'/gameData').set(G)
       .catch(e=>console.warn('게임 상태 저장 실패:',e));
   } else {
-    broadcastGameState('gameState'); // 로컬 모드 fallback
+    broadcastGameState('gameState');
   }
 }
+
 function nextTurn(){
   if(G.players.every(p=>Object.keys(p.scores).length>=CATS.length)){endGame();return;}
   let nxt=(G.cur+1)%G.players.length,tries=0;
-  while(Object.keys(G.players[nxt].scores).length>=CATS.length){nxt=(nxt+1)%G.players.length;if(++tries>G.players.length){endGame();return;}}
+  while(Object.keys(G.players[nxt].scores).length>=CATS.length){
+    nxt=(nxt+1)%G.players.length;
+    if(++tries>G.players.length){endGame();return;}
+  }
   if(nxt<=G.cur)G.round++;
   G.cur=nxt; G.scTab=nxt;
-  initTurn();updateHeader();renderPtabs();
-
-  // 멀티플레이: 내 차례인지 확인해서 버튼 활성/비활성
-  const myName  = window._myName || AUTH.displayName || AUTH.username;
-  const myIdx   = G.players.findIndex(p => p.name === myName);
-  const isMyTurn = myIdx === -1 || G.cur === myIdx;
-  const btn = document.getElementById('rollBtn');
-  if(!isMyTurn) {
-    btn.disabled = true;
-    btn.textContent = (G.players[G.cur]?.name || '상대방') + '의 차례 기다리는 중...';
-  } else {
-    btn.disabled = false;
-    btn.textContent = `🎲 굴리기 (${G.rolls}번 남음)`;
-  }
-
-  if(G.players[G.cur].isAI)setTimeout(aiTurn,700);
+  initTurn(); updateHeader(); renderPtabs();
+  if(G.players[G.cur].isAI) setTimeout(aiTurn,700);
 }
+
 
 // ─── Scorecard 탭 상태 ───
 // G.scTab : 현재 점수판에 표시 중인 플레이어 인덱스
@@ -2096,12 +2169,19 @@ function renderScBody() {
   const el      = document.getElementById('scContent');
   const banner  = document.getElementById('scViewBanner');
   const viewName= document.getElementById('scViewName');
+
+  // null 방어
+  if(!el || !G.players || !G.players.length) return;
   if(G.scTab === undefined || G.scTab === null) G.scTab = G.cur || 0;
+
   const viewIdx = Math.min(G.scTab, G.players.length - 1);
   const p       = G.players[viewIdx];
+
+  // player 또는 scores 없으면 복구
   if(!p) return;
   if(!p.scores || typeof p.scores !== 'object') p.scores = {};
-  const isMyTurn = viewIdx === G.cur;   // 현재 차례 플레이어 점수 보는 중
+
+  const isMyTurn = viewIdx === G.cur;
 
   // 뷰어 안내 배너 (내 차례 아닌 플레이어 점수 볼 때만 표시)
   if(!isMyTurn) {
