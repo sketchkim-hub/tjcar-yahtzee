@@ -1811,9 +1811,11 @@ function subscribeRoom(code) {
         const incoming = room.gameData;
         // 내가 방금 배치한 경우(cur가 나)는 무시 — 내 화면은 이미 업데이트됨
         const myName = window._myName||AUTH.displayName||AUTH.username;
-        const myIdx  = incoming.players ? incoming.players.findIndex(p=>p.name===myName) : -1;
-        // 현재 차례가 나이면 무시 (내가 직접 처리)
-        if(myIdx !== -1 && incoming.cur === myIdx) return;
+        // ✅ 수정된 코드
+// 게임 진행 중 → 항상 최신 상태로 동기화 (무시 로직 제거)
+G = JSON.parse(JSON.stringify(room.gameData));
+renderDice(); renderHints(); renderSC(); renderPtabs();
+updateHeader(); updateMyTurnUI();  // 내 차례면 버튼 활성화 ✅
         // 상대방 차례 → 상태 업데이트 후 UI 갱신
         G = JSON.parse(JSON.stringify(incoming));
         renderDice(); renderHints(); renderSC(); renderPtabs(); updateHeader();
