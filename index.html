@@ -1855,9 +1855,8 @@ function fullGameInit() {
   if(G.rolls  === undefined) G.rolls  = 2;
   if(G.rolled === undefined) G.rolled = false;
 
-  const myName  = window._myName || AUTH.displayName || AUTH.username;
+    const myName  = window._myName || AUTH.displayName || AUTH.username;
   const myIdx   = G.players ? G.players.findIndex(p => p.name === myName) : -1;
-  const isMyTurn = myIdx === -1 || G.cur === myIdx;
 
   renderDice();
   renderHints();
@@ -1866,10 +1865,19 @@ function fullGameInit() {
   updateHeader();
   updateRollBtn();
 
+  // myIdx 를 못 찾으면 (게스트 등) 방장이 아닌 경우 첫 차례 아님으로만 처리
+  // 이후 차례는 nextTurn() 이 관리하므로 여기서는 초기 상태만 설정
+  const isMyTurn = myIdx === -1 || G.cur === myIdx;
   if(!isMyTurn) {
     const btn = document.getElementById('rollBtn');
     btn.disabled = true;
-    btn.textContent = (G.players[G.cur]?.name || '상대방') + '의 차례';
+    btn.textContent = (G.players[G.cur]?.name || '상대방') + '의 차례 기다리는 중...';
+  } else {
+    const btn = document.getElementById('rollBtn');
+    btn.disabled = G.rolls <= 0;
+    btn.textContent = G.rolls > 0
+      ? `🎲 굴리기 (${G.rolls}번 남음)`
+      : '📋 배치하세요!';
   }
 }
 
@@ -2014,8 +2022,22 @@ function nextTurn(){
   let nxt=(G.cur+1)%G.players.length,tries=0;
   while(Object.keys(G.players[nxt].scores).length>=CATS.length){nxt=(nxt+1)%G.players.length;if(++tries>G.players.length){endGame();return;}}
   if(nxt<=G.cur)G.round++;
-  G.cur=nxt; G.scTab=nxt;  // 차례가 넘어가면 탭도 해당 플레이어로 이동
+  G.cur=nxt; G.scTab=nxt;
   initTurn();updateHeader();renderPtabs();
+
+  // 멀티플레이: 내 차례인지 확인해서 버튼 활성/비활성
+  const myName  = window._myName || AUTH.displayName || AUTH.username;
+  const myIdx   = G.players.findIndex(p => p.name === myName);
+  const isMyTurn = myIdx === -1 || G.cur === myIdx;
+  const btn = document.getElementById('rollBtn');
+  if(!isMyTurn) {
+    btn.disabled = true;
+    btn.textContent = (G.players[G.cur]?.name || '상대방') + '의 차례 기다리는 중...';
+  } else {
+    btn.disabled = false;
+    btn.textContent = `🎲 굴리기 (${G.rolls}번 남음)`;
+  }
+
   if(G.players[G.cur].isAI)setTimeout(aiTurn,700);
 }
 
