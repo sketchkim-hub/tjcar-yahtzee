@@ -1836,8 +1836,27 @@ function fullGameInit() {
   document.getElementById('ptabs').style.display = 'flex';
   document.getElementById('aiLogBox').style.display = 'block';
 
-  const myName = window._myName || AUTH.displayName || AUTH.username;
-  const myIdx  = G.players.findIndex(p => p.name === myName);
+  // 직렬화 후 scores 등 필수 필드 복구
+  if(G.players) {
+    G.players = G.players.map(p => ({
+      ...p,
+      scores:     (p.scores && typeof p.scores === 'object') ? p.scores : {},
+      _yb:        p._yb        || 0,
+      nftBonus:   p.nftBonus   || 0,
+      nftCount:   p.nftCount   || 0,
+      nftAvatar:  p.nftAvatar  || '',
+      avatar:     p.avatar     || '',
+      waxAccount: p.waxAccount || '',
+    }));
+  }
+  if(G.scTab === undefined) G.scTab = G.cur || 0;
+  if(!G.dice)  G.dice = [0,0,0,0,0];
+  if(!G.held)  G.held = [false,false,false,false,false];
+  if(G.rolls  === undefined) G.rolls  = 2;
+  if(G.rolled === undefined) G.rolled = false;
+
+  const myName  = window._myName || AUTH.displayName || AUTH.username;
+  const myIdx   = G.players ? G.players.findIndex(p => p.name === myName) : -1;
   const isMyTurn = myIdx === -1 || G.cur === myIdx;
 
   renderDice();
@@ -2004,6 +2023,7 @@ function renderSC() {
 // ── 점수판 탭 바 렌더 ──
 function renderScTabs() {
   const bar = document.getElementById('scTabBar');
+  if(!bar || !G.players || !G.players.length) return;
   bar.innerHTML = G.players.map((p, i) => {
     const isCur  = i === G.cur;
     const isView = i === G.scTab;
@@ -2035,9 +2055,12 @@ function renderScBody() {
   const el      = document.getElementById('scContent');
   const banner  = document.getElementById('scViewBanner');
   const viewName= document.getElementById('scViewName');
-  const viewIdx = G.scTab;
+  if(G.scTab === undefined || G.scTab === null) G.scTab = G.cur || 0;
+  const viewIdx = Math.min(G.scTab, G.players.length - 1);
   const p       = G.players[viewIdx];
-  const isMyTurn= viewIdx === G.cur;   // 현재 차례 플레이어 점수 보는 중
+  if(!p) return;
+  if(!p.scores || typeof p.scores !== 'object') p.scores = {};
+  const isMyTurn = viewIdx === G.cur;   // 현재 차례 플레이어 점수 보는 중
 
   // 뷰어 안내 배너 (내 차례 아닌 플레이어 점수 볼 때만 표시)
   if(!isMyTurn) {
