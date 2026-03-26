@@ -1995,7 +1995,7 @@ function launchMultiGame(players, code, db) {
   fullGameInit();
 
   if(db) {
-    db.ref('rooms/'+code).update({ started:true, gameData:G })
+    db.ref('rooms/'+code).update({ started:true, gameData:G })  // ← 이 줄 있는지
       .catch(e=>console.warn('시작 신호 실패:',e));
   } else {
     broadcastGameState('start');
@@ -2091,11 +2091,10 @@ function placeScore(catId,idx=null){
     if(myIdx!==-1 && G.cur!==myIdx){ toast('내 차례가 아닙니다'); return; }
   }
   if(catId==='yahtzee'&&p.scores.yahtzee===50&&sc('yahtzee',G.dice)===50)p._yb=(p._yb||0)+100;
-  p.scores[catId]=sc(catId,G.dice);
+   p.scores[catId]=sc(catId,G.dice);
   renderSC(); nextTurn();
 
-  // Firebase / BroadcastChannel 으로 상태 동기화
-  syncGameState();
+  syncGameState();   // ← 이 줄이 있어야 합니다
 }
 
 // ─── 게임 상태 동기화 (Firebase 또는 BroadcastChannel) ───
