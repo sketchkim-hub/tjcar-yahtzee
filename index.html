@@ -687,7 +687,7 @@ input[type=password]:focus{border-color:var(--steem);}
       <div style="color:var(--text-dim);font-size:0.7rem;margin:4px 0;" id="waitStatus">최소 2명 필요</div>
       <div class="w-btns">
         <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="addBot()">🤖 봇 추가</button>
-        <button class="btn btn-primary" id="startBtn" style="flex:2;" onclick="startMulti()" disabled>🎲 시작!</button>
+        <button class="btn btn-primary" id="startBtn" style="flex:2;" onclick="startMulti()" disabled style="display:none;">🎲 시작!</button>
       </div>
       <button class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="showScreen('lobby')">← 뒤로</button>
     </div>
@@ -1927,9 +1927,19 @@ function renderWait(players){
       ${p.nftCount>0?`<span class="w-nft-badge">NFT×${p.nftCount}</span>`:''}
       ${i===0?'<span style="font-size:0.62rem;color:var(--text-dim);">방장</span>':''}
     </div>`).join('');
-  document.getElementById('startBtn').disabled = players.length < 2;
+  const myName = window._myName || AUTH.displayName || AUTH.username;
+  const isHost = players.length > 0 && players[0].name === myName;
+  const btn = document.getElementById('startBtn');
+
+  btn.style.display = isHost ? 'block' : 'none';
+  btn.disabled = players.length < 2;
+
   document.getElementById('waitStatus').textContent =
-    players.length < 2 ? '최소 2명 필요' : players.length+'명 준비 완료 ✓';
+    players.length < 2
+      ? '최소 2명 필요'
+      : isHost
+        ? players.length + '명 준비 완료 ✓ — 시작 버튼을 눌러주세요!'
+        : players.length + '명 참가 완료 — 방장이 시작할 때까지 기다려주세요 ⏳';
 }
 
 // ─── 멀티 게임 시작 ───
