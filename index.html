@@ -2010,12 +2010,21 @@ function renderHints(){
 }
 
 // ─── Place score ───
-function placeScore(catId,idx=null){
+function placeScore(catId, idx=null){
   const i=idx??G.cur,p=G.players[i];
   if(p.scores[catId]!==undefined||!G.rolled)return;
   if(catId==='yahtzee'&&p.scores.yahtzee===50&&sc('yahtzee',G.dice)===50)p._yb=(p._yb||0)+100;
   p.scores[catId]=sc(catId,G.dice);
   renderSC();nextTurn();
+
+  // Firebase에 게임 상태 동기화 (다른 기기에 전달)
+  const db = initFirebase();
+  if(db && window._RC) {
+    db.ref('rooms/'+window._RC+'/gameData').set(G)
+      .catch(e=>console.warn('게임 상태 저장 실패:',e));
+  } else {
+    broadcastGameState('gameState'); // 로컬 모드 fallback
+  }
 }
 function nextTurn(){
   if(G.players.every(p=>Object.keys(p.scores).length>=CATS.length)){endGame();return;}
