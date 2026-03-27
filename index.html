@@ -1004,16 +1004,15 @@ input[type=password]:focus{border-color:var(--steem);}
 
 const FIREBASE_CFG = {
   // ★ Firebase 콘솔에서 복사한 설정값으로 교체하세요
-  apiKey: "AIzaSyAroo_XGF1vH3pCo_eBWE3ig4xeLddn3fM",
-  authDomain: "tjcar-yahtzee-ecb17.firebaseapp.com",
-  databaseURL: "https://tjcar-yahtzee-ecb17-default-rtdb.firebaseio.com",
-  projectId: "tjcar-yahtzee-ecb17",
-  storageBucket: "tjcar-yahtzee-ecb17.firebasestorage.app",
-  messagingSenderId: "584429405950",
-  appId: "1:584429405950:web:d038034d4675805512c7af"
+  apiKey:            "여기에_apiKey",
+  authDomain:        "여기에_authDomain",
+  databaseURL:       "여기에_databaseURL",   // 반드시 입력! (Realtime DB URL)
+  projectId:         "여기에_projectId",
+  storageBucket:     "여기에_storageBucket",
+  messagingSenderId: "여기에_messagingSenderId",
+  appId:             "여기에_appId",
 };
 
-  
 // Firebase 초기화 (databaseURL 없으면 로컬 모드로 fallback)
 let _db = null;
 function initFirebase() {
@@ -1788,7 +1787,6 @@ function subscribeRoom(code) {
   const db = initFirebase();
 
   if(db) {
-    // ── Firebase 모드 ──
     const roomRef = db.ref('rooms/'+code);
     const handler = roomRef.on('value', snap => {
       const room = snap.val();
@@ -1798,34 +1796,51 @@ function subscribeRoom(code) {
       // 대기실 업데이트
       if(document.getElementById('waiting').classList.contains('active')) {
         updateWaitUI(code, players);
+        return;
       }
 
-      // 게임 시작 신호 → 참가자 화면 전환
-      if(room.started && room.gameData) {
-        if(!document.getElementById('game').classList.contains('active')) {
+      // 게임 화면이 아직 아님 → 시작 신호 확인
+      if(!document.getElementById('game').classList.contains('active')) {
+        if(room.started && room.gameData) {
           G = JSON.parse(JSON.stringify(room.gameData));
           fullGameInit();
-          return;
         }
-        // 이미 게임 중 → 상태 동기화 (다른 플레이어가 점수 배치했을 때)
-        const incoming = room.gameData;
-        // 내가 방금 배치한 경우(cur가 나)는 무시 — 내 화면은 이미 업데이트됨
-        const myName = window._myName||AUTH.displayName||AUTH.username;
-        // ✅ 수정된 코드
-// 게임 진행 중 → 항상 최신 상태로 동기화 (무시 로직 제거)
-G = JSON.parse(JSON.stringify(room.gameData));
-renderDice(); renderHints(); renderSC(); renderPtabs();
-updateHeader(); updateMyTurnUI();  // 내 차례면 버튼 활성화 ✅
-        // 상대방 차례 → 상태 업데이트 후 UI 갱신
-        G = JSON.parse(JSON.stringify(incoming));
-        renderDice(); renderHints(); renderSC(); renderPtabs(); updateHeader();
-        updateMyTurnUI();
+        return;
       }
+
+      // 게임 진행 중 → 항상 최신 상태로 동기화
+      if(!room.gameData) return;
+      G = JSON.parse(JSON.stringify(room.gameData));
+
+      // scores 등 필수 필드 복구
+      if(G.players) {
+        G.players = G.players.map(p => ({
+          ...p,
+          scores:     (p.scores && typeof p.scores==='object') ? p.scores : {},
+          _yb:        p._yb        || 0,
+          nftBonus:   p.nftBonus   || 0,
+          nftCount:   p.nftCount   || 0,
+          avatar:     p.avatar     || '',
+          waxAccount: p.waxAccount || '',
+        }));
+      }
+      if(G.scTab === undefined) G.scTab = G.cur || 0;
+      if(!G.dice)  G.dice  = [0,0,0,0,0];
+      if(!G.held)  G.held  = [false,false,false,false,false];
+      if(G.rolls  === undefined) G.rolls  = 2;
+      if(G.rolled === undefined) G.rolled = false;
+
+      renderDice();
+      renderHints();
+      renderSC();
+      renderPtabs();
+      updateHeader();
+      updateMyTurnUI();
     });
     _roomListener = () => roomRef.off('value', handler);
 
   } else {
-    // ── 로컬 모드: BroadcastChannel ──
+    // 로컬 모드: BroadcastChannel
     try {
       const bc = new BroadcastChannel('tjcar_room_'+code);
       bc.onmessage = (e) => {
@@ -1997,7 +2012,7 @@ function launchMultiGame(players, code, db) {
   fullGameInit();
 
   if(db) {
-    db.ref('rooms/'+code).update({ started:true, gameData:G })  // ← 이 줄 있는지
+    db.ref('rooms/'+code).update({ started:true, gameData:G })
       .catch(e=>console.warn('시작 신호 실패:',e));
   } else {
     broadcastGameState('start');
@@ -2093,10 +2108,11 @@ function placeScore(catId,idx=null){
     if(myIdx!==-1 && G.cur!==myIdx){ toast('내 차례가 아닙니다'); return; }
   }
   if(catId==='yahtzee'&&p.scores.yahtzee===50&&sc('yahtzee',G.dice)===50)p._yb=(p._yb||0)+100;
-   p.scores[catId]=sc(catId,G.dice);
+  p.scores[catId]=sc(catId,G.dice);
   renderSC(); nextTurn();
 
-  syncGameState();   // ← 이 줄이 있어야 합니다
+  // Firebase / BroadcastChannel 으로 상태 동기화
+  syncGameState();
 }
 
 // ─── 게임 상태 동기화 (Firebase 또는 BroadcastChannel) ───
