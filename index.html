@@ -1817,6 +1817,22 @@ function subscribeRoom(code) {
       // ── 게임 진행 중: 항상 최신 상태로 동기화 ──
       if(!room.gameData) return;
       G = sanitizeGameData(room.gameData);
+
+      // 게임 종료 상태 수신 → 결과 화면으로 이동
+      if(G.over) {
+        const ranked = G.players
+          .map(p=>({name:p.name, score:total(p), yahtzee:p.scores.yahtzee===50,
+                    avatar:p.avatar||'', nftAvatar:p.nftAvatar||'',
+                    nftCount:p.nftCount||0, nftBonus:p.nftBonus||0, waxAccount:p.waxAccount||''}))
+          .sort((a,b)=>b.score-a.score);
+        saveLB(ranked); renderResult(ranked); showScreen('result');
+        const postSec = document.getElementById('steemPostSection');
+        if(postSec) postSec.style.display='none';
+        const awardSec = document.getElementById('awardSection');
+        if(awardSec) awardSec.style.display='none';
+        return;
+      }
+
       renderDice(); renderHints(); renderSC(); renderPtabs(); updateHeader();
       updateMyTurnUI();
     });
@@ -2138,16 +2154,20 @@ function placeScore(catId,idx=null){
 }
 
 function nextTurn(){
-  if(G.players.every(p=>Object.keys(p.scores).length>=CATS.length)){endGame();return;}
-  let nxt=(G.cur+1)%G.players.length,tries=0;
-  while(Object.keys(G.players[nxt].scores).length>=CATS.length){
-    nxt=(nxt+1)%G.players.length;
-    if(++tries>G.players.length){endGame();return;}
+  // 모든 플레이어가 13칸 다 채웠으면 게임 종료
+  if(G.players.every(p => Object.keys(p.scores).length >= CATS.length)){
+    endGame();
+    return;
   }
-  if(nxt<=G.cur)G.round++;
+  let nxt=(G.cur+1)%G.players.length, tries=0;
+  while(Object.keys(G.players[nxt].scores).length >= CATS.length){
+    nxt=(nxt+1)%G.players.length;
+    if(++tries > G.players.length){ endGame(); return; }
+  }
+  if(nxt<=G.cur) G.round++;
   G.cur=nxt; G.scTab=nxt;
   initTurn(); updateHeader(); renderPtabs();
-  if(G.players[G.cur].isAI)setTimeout(aiTurn,700);
+  if(G.players[G.cur].isAI) setTimeout(aiTurn, 700);
 }
 
 // ─── Scorecard 탭 상태 ───
@@ -2316,7 +2336,10 @@ function wait(ms){return new Promise(r=>setTimeout(r,ms));}
 // END GAME
 // ═══════════════════════════════════════════════
 function endGame(){
+  if(G.over) return;  // 중복 호출 방지
   G.over=true;
+  // 멀티플레이: 게임 종료 상태를 다른 플레이어에게 동기화
+  syncGameState();
   const ranked=G.players.map(p=>({
     name:p.name,score:total(p),yahtzee:p.scores.yahtzee===50,
     avatar:p.avatar||'',nftAvatar:p.nftAvatar||'',
