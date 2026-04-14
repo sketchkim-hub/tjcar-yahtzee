@@ -775,7 +775,7 @@ input[type=password]:focus{border-color:var(--steem);}
         <div id="steemPostPreview" style="background:#0a0a18;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:0.75rem;color:var(--text-dim);line-height:1.8;max-height:140px;overflow-y:auto;margin-bottom:8px;"></div>
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div class="ig">
-            <label>태그 (쉼표 구분, 최대 5개)</label>
+            <label>태그 (영어 소문자만, 쉼표 구분, 최대 5개)</label>
             <input type="text" id="postTags" value="tjcar,tnftgame,boardgame,yahtzee,gaming"
               style="font-size:0.8rem;padding:8px 12px;">
           </div>
@@ -3128,19 +3128,22 @@ async function postToSteem() {
 
   // 태그 파싱 (최대 5개, 영문·숫자·한글만)
   const rawTags = document.getElementById('postTags').value;
-  const tags = rawTags.split(',')
-    .map(t => t.trim().toLowerCase().replace(/[^a-z0-9가-힣\-]/g,''))
-    .filter(Boolean)
-    .slice(0, 5);
-  if(!tags.length) tags.push('tjcar야찌');
+const tags = rawTags.split(',')
+  .map(t => t.trim().toLowerCase().replace(/[^a-z0-9\-]/g, ''))
+  .filter(t => t.length > 0)
+  .slice(0, 5);
+if(!tags.length) tags.push('tjcar');
 
-  const permlink = 'tjcar-yahtzee-' + now;
-  const jsonMeta = JSON.stringify({ tags, app:'tjcar-yahtzee/1.0', format:'markdown' });
+// permlink: 영숫자와 하이픈만 허용
+const permlink = 'tjcar-yahtzee-' + now;
+const jsonMeta = JSON.stringify({ tags, app:'tjcar-yahtzee/1.0', format:'markdown' });
 
+// 타이틀에서 이모지 제거 (스팀 호환성)
+const safeTitle = title.replace(/[\u{1F000}-\u{1FFFF}]|[\u2600-\u27FF]/gu, '').trim();
   try {
     if(su.method === 'kc') {
       // Keychain 방식
-      await postWithKeychain(su.username, title, body, permlink, tags[0], jsonMeta);
+      await postWithKeychain(su.username, safeTitle, body, permlink, tags[0], jsonMeta);
     } else if(su.method === 'pk' && su._pk) {
       // 포스팅키 방식
       await postWithPostingKey(su._pk, su.username, title, body, permlink, tags[0], jsonMeta);
@@ -3170,14 +3173,57 @@ async function postToSteem() {
 // Keychain으로 포스팅
 function postWithKeychain(username, title, body, permlink, category, jsonMeta) {
   return new Promise((resolve, reject) => {
-    if(typeof window.steem_keychain === 'undefined') { reject(new Error('Keychain 없음')); return; }
-    window.steem_keychain.requestPost(
-      username, title, body, category, '', permlink, jsonMeta, '', '[]',
-      response => {
-        if(response.success) resolve(response);
-        else reject(new Error(response.message || response.error || '포스팅 실패'));
+    if(typeof window.steem_keychain === 'undefined') {
+      reject(new Error('Steem Keychain이 설치되지 않았습니다'));
+      return;
+    }
+
+    // category(첫번째 태그)도 영소문자만 허용
+    const safeCategory = category.replace(/[^a-z0-9\-]/g, '') || 'kr';
+
+    // permlink 안전하게 정리
+    const safePermlink = permlink.replace(/[^a-z0-9\-]/g, '').toLowerCase();
+
+    const operations = [[
+      'comment', {
+        parent_author:   '',
+        parent_permlink: safeCategory,
+        author:          username,
+        permlink:        safePermlink,
+        title:           title,
+        body:            body,
+        json_metadata:   jsonMeta,
       }
-    );
+    ]];
+
+    // requestPost 먼저 시도 (신버전 Keychain)
+    if(typeof window.steem_keychain.requestPost === 'function') {
+      window.steem_keychain.requestPost(
+        username, title, body, safeCategory, '', safePermlink, jsonMeta, '', '[]',
+        response => {
+          if(response.success) resolve(response);
+          else {
+            // requestPost 실패 시 requestBroadcast 로 재시도
+            window.steem_keychain.requestBroadcast(
+              username, operations, 'Posting',
+              r => {
+                if(r.success) resolve(r);
+                else reject(new Error(r.message || r.error || '포스팅 실패'));
+              }
+            );
+          }
+        }
+      );
+    } else {
+      // 구버전 Keychain → requestBroadcast 바로 사용
+      window.steem_keychain.requestBroadcast(
+        username, operations, 'Posting',
+        response => {
+          if(response.success) resolve(response);
+          else reject(new Error(response.message || response.error || '포스팅 실패'));
+        }
+      );
+    }
   });
 }
 
